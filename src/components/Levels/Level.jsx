@@ -1,4 +1,7 @@
-import { Container } from '@pixi/react'
+import { extend } from '@pixi/react'
+import { Container } from 'pixi.js'
+
+extend({ Container })
 
 // TODO: Adicionar tilemap.png em src/assets/ e descomentar o código abaixo
 // import { GAME_HEIGHT, GAME_WIDTH, OFFSET_X, OFFSET_Y } from '../../constants/game-world'
@@ -7,7 +10,7 @@ import { Container } from '@pixi/react'
 
 export const Level = () => {
   // Placeholder até tilemap.png ser adicionado
-  return <Container />
+  return <container />
   
   // Descomentar quando tilemap.png existir:
   // return (

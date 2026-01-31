@@ -31,15 +31,19 @@ export const useHeroAnimation = ({
 
   // Cria uma nova textura cortando uma região específica (Rectangle) da textura original
   const createSprite = (row, column) => {
-    const frame = new Texture(
-      texture.baseTexture,
-      new Rectangle(
+    if (!texture) {
+      return null
+    }
+    
+    const frame = new Texture({
+      source: texture.source,
+      frame: new Rectangle(
         column * frameWidth,
         row * frameHeight,
         frameWidth,
         frameHeight
       )
-    )
+    })
 
     const newSprite = new Sprite(frame)
     newSprite.width = TILE_SIZE

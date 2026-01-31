@@ -1,6 +1,9 @@
 import { useRef } from 'react'
-import { Container, useTick } from '@pixi/react'
+import { extend, useTick } from '@pixi/react'
+import { Container } from 'pixi.js'
 import { TILE_SIZE, ZOOM } from '../../constants/game-world'
+
+extend({ Container })
 
 const lerp = (start, end) => {
   return start + (end - start) * 0.03
@@ -30,8 +33,8 @@ export const Camera = ({ heroPosition, canvasSize, children }) => {
   })
 
   return (
-    <Container ref={containerRef} scale={ZOOM}>
+    <container ref={containerRef} scale={ZOOM}>
       {children}
-    </Container>
+    </container>
   )
 }

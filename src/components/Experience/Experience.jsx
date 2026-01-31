@@ -1,6 +1,6 @@
 import { Application } from '@pixi/react'
 import { useCallback, useState, useEffect } from 'react'
-import { calculateCanvasSize } from '../utils/common'
+import { calculateCanvasSize } from '../utils/common.js'
 import { MainContainer } from './MainContainer/MainContainer'
 
 export const Main = () => {

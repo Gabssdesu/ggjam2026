@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react'
-import { Sprite, Container, useTick } from '@pixi/react'
+import { extend, useTick } from '@pixi/react'
+import { Container, Sprite } from 'pixi.js'
 import {
   ANIMATION_SPEED,
   DEFAULT_X_POS,
@@ -11,8 +12,11 @@ import {
   calculateNewTarget,
   checkCanMove,
   handleMovement,
-} from '../../utils/common'
+} from '../utils/common.js'
 import { useHeroAnimation } from './useHeroAnimation'
+
+// Registrar componentes Pixi para uso em JSX
+extend({ Container, Sprite })
 
 export const Hero = ({ texture, onMove }) => {
   const position = useRef({ x: DEFAULT_X_POS, y: DEFAULT_Y_POS })
@@ -76,9 +80,9 @@ export const Hero = ({ texture, onMove }) => {
   })
 
   return (
-    <Container>
+    <container>
       {sprite && (
-        <Sprite
+        <sprite
           texture={sprite.texture}
           x={position.current.x}
           y={position.current.y}
@@ -86,6 +90,6 @@ export const Hero = ({ texture, onMove }) => {
           anchor={[0, 0.4]}
         />
       )}
-    </Container>
+    </container>
   )
 }
