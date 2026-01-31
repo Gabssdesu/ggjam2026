@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect, useState } from 'react'
 import { extend, useTick } from '@pixi/react'
 import { Container, Sprite } from 'pixi.js'
 import {
@@ -19,7 +19,8 @@ import { useHeroAnimation } from './useHeroAnimation'
 extend({ Container, Sprite })
 
 export const Hero = ({ texture, onMove }) => {
-  const position = useRef({ x: DEFAULT_X_POS, y: DEFAULT_Y_POS })
+  const [position, setPosition] = useState({ x: DEFAULT_X_POS, y: DEFAULT_Y_POS })
+  const positionRef = useRef(position)
   const targetPosition = useRef(null)
   const currentDirection = useRef(null)
   const { getControlsDirection } = useHeroControls()
@@ -34,41 +35,43 @@ export const Hero = ({ texture, onMove }) => {
   })
 
   useEffect(() => {
-    onMove(position.current.x, position.current.y)
-  }, [onMove])
+    positionRef.current = position
+    onMove(position.x, position.y)
+  }, [position, onMove])
 
   const setNextTarget = useCallback((direction) => {
     if (targetPosition.current) return
-    
-    const { x, y } = position.current
+
+    const { x, y } = positionRef.current
     currentDirection.current = direction
     const newTarget = calculateNewTarget(x, y, direction)
 
     if (checkCanMove(newTarget)) {
       targetPosition.current = newTarget
     }
-  }, [])
+  }, [positionRef])
 
   useTick((delta) => {
     const direction = getControlsDirection()
-    
+
     if (direction) {
       setNextTarget(direction)
     }
 
     if (targetPosition.current) {
       const { position: newPosition, completed } = handleMovement(
-        position.current,
+        positionRef.current,
         targetPosition.current,
         MOVE_SPEED,
         delta
       )
 
-      position.current = newPosition
+      positionRef.current = newPosition
+      setPosition(newPosition)
       isMoving.current = true
 
       if (completed) {
-        const { x, y } = position.current
+        const { x, y } = newPosition
         onMove(x, y)
 
         targetPosition.current = null
@@ -84,8 +87,8 @@ export const Hero = ({ texture, onMove }) => {
       {sprite && (
         <sprite
           texture={sprite.texture}
-          x={position.current.x}
-          y={position.current.y}
+          x={position.x}
+          y={position.y}
           scale={0.5}
           anchor={[0, 0.4]}
         />
