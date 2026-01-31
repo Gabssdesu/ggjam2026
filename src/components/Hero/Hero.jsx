@@ -6,9 +6,10 @@ export class Hero {
     // Propriedades Visuais
     sprite = null;
     animations = {};
-    currentAnim = 'idle';
+    currentAnim = '';
     x = 0;
     y = 0;
+    lastDirection = 'down'; // Começa olhando pra baixo
 
     // Estados de Input e Movimento
     movingDirection = [];
@@ -40,11 +41,16 @@ export class Hero {
             up: this.extract(baseTexture, 0, 6, fw, fh, 6),  // 6-11
             left: this.extract(baseTexture, 0, 12, fw, fh, 6), // 12-17
             down: this.extract(baseTexture, 0, 18, fw, fh, 6), // 18-23
-            idle: this.extract(baseTexture, 0, 18, fw, fh, 1)  // Primeiro frame de baixo
+
+            // Idles direcionais (1º frame de cada direção)
+            idle_right: this.extract(baseTexture, 0, 0, fw, fh, 1),
+            idle_up: this.extract(baseTexture, 0, 6, fw, fh, 1),
+            idle_left: this.extract(baseTexture, 0, 12, fw, fh, 1),
+            idle_down: this.extract(baseTexture, 0, 18, fw, fh, 1)
         };
 
         // Inicializar Sprite
-        this.sprite = new AnimatedSprite(this.animations.idle);
+        this.sprite = new AnimatedSprite(this.animations.idle_down);
         this.sprite.animationSpeed = 0.15;
         this.sprite.anchor.set(0.5, 1); // Ancorar nos pés
         this.sprite.play();
@@ -118,10 +124,9 @@ export class Hero {
     update(collisionMap) {
         let vx = 0;
         let vy = 0;
-        let nextAnim = 'idle';
+        let nextAnim = '';
 
-        // Determinar velocidade baseada no input (última tecla pressionada ganha prioridade não implementado, 
-        // usando lógica simples de soma de vetores, mas com anulação mútua)
+        // Determinar velocidade baseada no input
 
         const isRight = this.movingDirection.includes('right');
         const isLeft = this.movingDirection.includes('left');
@@ -142,6 +147,7 @@ export class Hero {
 
         // --- SISTEMA DE ENERGIA ---
         const isMoving = vx !== 0 || vy !== 0;
+
         if (this.isRunning && isMoving) {
             this.energia -= 0.8; // Gasta energia ao correr
             if (this.energia <= 0) {
@@ -162,13 +168,16 @@ export class Hero {
             if (isDown || isUp) vy *= 1.6;
         }
 
-        // Determinar animação
-        if (vx > 0) nextAnim = 'right';
-        else if (vx < 0) nextAnim = 'left';
-        else if (vy > 0) nextAnim = 'down';
-        else if (vy < 0) nextAnim = 'up';
+        // Determinar animação e atualizar última direção
+        if (vx > 0) { nextAnim = 'right'; this.lastDirection = 'right'; }
+        else if (vx < 0) { nextAnim = 'left'; this.lastDirection = 'left'; }
+        else if (vy > 0) { nextAnim = 'down'; this.lastDirection = 'down'; }
+        else if (vy < 0) { nextAnim = 'up'; this.lastDirection = 'up'; }
 
-        if (vx === 0 && vy === 0) nextAnim = 'idle';
+        // Se parado, usar idle da última direção
+        if (vx === 0 && vy === 0) {
+            nextAnim = 'idle_' + this.lastDirection;
+        }
 
         if (vx !== 0 || vy !== 0) {
             const nextX = this.x + vx;
@@ -187,17 +196,12 @@ export class Hero {
                     this.y += vy;
                 }
             }
+        }
 
-            if (this.currentAnim !== nextAnim) {
-                this.currentAnim = nextAnim;
-                this.sprite.textures = this.animations[nextAnim];
-                this.sprite.play();
-            }
-        } else {
-            if (this.currentAnim !== 'idle') {
-                this.currentAnim = 'idle';
-                this.sprite.textures = this.animations.idle;
-            }
+        if (this.currentAnim !== nextAnim) {
+            this.currentAnim = nextAnim;
+            this.sprite.textures = this.animations[nextAnim];
+            this.sprite.play();
         }
 
         this.updateSpritePosition();
