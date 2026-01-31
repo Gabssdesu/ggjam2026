@@ -1,69 +1,29 @@
 import React, { useEffect, useRef } from 'react';
-import { Application, Sprite, Text, Assets, Graphics } from 'pixi.js';
-import loiraImage from '../../assets/loira.png';
-import mapaImage from '../../assets/mapa_teste.png'
+import { Application, Sprite, Assets, Graphics, Container, Text } from 'pixi.js';
+import loiraImage from '../../assets/heroina.png';
 import { Hero } from '../Hero/Hero.jsx';
-
-const CANVAS_WIDTH = 1300;
-const CANVAS_HEIGHT = 600;
-const GROUND_Y = 400;
-const CHARACTER_SPEED = 5
+import MAPS from '../../constants/maps.js'
+import {
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT,
+    INITIAL_PLAYER_X,
+    INITIAL_PLAYER_Y,
+    HERO_HITBOX_WIDTH,
+    HERO_HITBOX_HEIGHT,
+    TILE_SIZE
+} from '../../constants/game-world';
 
 export default function Game() {
     const canvasRef = useRef(null);
     const appRef = useRef(null);
-    const playerRef = useRef(null);
-    const gameStateRef = useRef({
-        playerX: 100,
-        playerY: 400,
-        movingDirection: [],
-        directionHorizontal: 1,
-        directionVertical: 0
-    });
-
-    // Mapa de colisão baseado na imagem (1 = bloqueado, 0 = passável) - tileSize 50px
-    const collisionMap = [
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Teto/parede superior
-        [1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],// Janelas
-        [1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],// Faixa horizontal
-        [1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1], // Mesas
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], // Espaço livre
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], // Espaço livre
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1], // Piso
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1], // Piso
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], // Piso
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], // Piso inferior
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], // Piso inferior
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]  // Parede inferior
-    ];
-
-    // Verificar colisão antes de mover (considerando tamanho do personagem)
-    // 1 bloco de largura = 50px, 2 blocos de altura = 100px
-    const canMove = (newX, newY, playerWidth = 50, playerHeight = 100, tileSize = 50) => {
-        // Verificar as 4 quinas do personagem
-        const corners = [
-            { x: newX, y: newY },
-            { x: newX + playerWidth, y: newY },
-            { x: newX, y: newY + playerHeight },
-            { x: newX + playerWidth, y: newY + playerHeight }
-        ];
-
-        for (let corner of corners) {
-            const col = Math.floor(corner.x / tileSize);
-            const row = Math.floor(corner.y / tileSize);
-            if (collisionMap[row]?.[col] === 1) {
-                return false; // Colidiu com obstáculo
-            }
-        }
-        return true; // Pode se mover
-    };
+    const heroRef = useRef(null);
+    const currentMapRef = useRef('HALLSPAWN');
+    const mapSpriteRef = useRef(null);
+    const debugLayerRef = useRef(null);
 
     useEffect(() => {
         let destroyed = false;
         let app;
-       // let player;
-        let handleKeyDown;
-        let handleKeyUp;
 
         const setup = async () => {
             if (canvasRef.current) {
@@ -74,6 +34,7 @@ export default function Game() {
                 });
             }
 
+            // Inicializar Pixi
             app = new Application();
             await app.init({
                 width: CANVAS_WIDTH,
@@ -81,133 +42,113 @@ export default function Game() {
                 backgroundColor: 0x87ceeb,
             });
             appRef.current = app;
-            if (canvasRef.current) {
+
+            if (canvasRef.current && !destroyed) {
                 canvasRef.current.appendChild(app.canvas);
             }
 
-            // Carregar e adicionar mapa como fundo
-            const mapaTexture = await Assets.load(mapaImage);
-            const mapa = new Sprite(mapaTexture);
-            mapa.width = CANVAS_WIDTH;
-            mapa.height = CANVAS_HEIGHT;
-            app.stage.addChild(mapa);
+            // Camada de Debug
+            const debugLayer = new Container();
+            debugLayerRef.current = debugLayer;
 
-            // Desenhar grid de colisão para debug
-            const tileSize = 50;
-            const gridGraphics = new Graphics();
-            collisionMap.forEach((row, rowIndex) => {
-                row.forEach((tile, colIndex) => {
-                    const x = colIndex * tileSize;
-                    const y = rowIndex * tileSize;
-                    
-                    // Desenhar retângulo semitransparente
-                    if (tile === 1) {
-                        gridGraphics.rect(x, y, tileSize, tileSize);
-                        gridGraphics.fill({ color: 0xff0000, alpha: 0.3 }); // Vermelho para bloqueado
-                    } else {
-                        gridGraphics.rect(x, y, tileSize, tileSize);
-                        gridGraphics.fill({ color: 0x00ff00, alpha: 0.1 }); // Verde claro para passável
+            const loadMap = async (mapId, spawnX, spawnY) => {
+                const config = MAPS[mapId];
+                if (!config) return;
+
+                // Remover mapa antigo se existir
+                if (mapSpriteRef.current) {
+                    app.stage.removeChild(mapSpriteRef.current);
+                }
+
+                // Carregar e adicionar novo mapa
+                const mapaTexture = await Assets.load(config.asset);
+                const mapa = new Sprite(mapaTexture);
+                mapa.width = CANVAS_WIDTH;
+                mapa.height = CANVAS_HEIGHT;
+
+                // Adiciona no índice 0 para ficar atrás do Herói
+                app.stage.addChildAt(mapa, 0);
+                mapSpriteRef.current = mapa;
+                currentMapRef.current = mapId;
+
+                // Reposicionar Herói
+                if (heroRef.current) {
+                    heroRef.current.x = spawnX;
+                    heroRef.current.y = spawnY;
+                }
+
+                // DEBUG: Desenhar grid de colisão
+                if (debugLayerRef.current) {
+                    debugLayerRef.current.removeChildren();
+
+                    if (config.collisionMap) {
+                        const graphics = new Graphics();
+                        const textContainer = new Container();
+
+                        config.collisionMap.forEach((row, rowIndex) => {
+                            row.forEach((tile, colIndex) => {
+                                const x = colIndex * TILE_SIZE;
+                                const y = rowIndex * TILE_SIZE;
+
+                                // Desenhar retângulo
+                                if (tile === 1) {
+                                    graphics.rect(x, y, TILE_SIZE, TILE_SIZE);
+                                    graphics.fill({ color: 0xff0000, alpha: 0.3 }); // Vermelho bloqueado
+                                } else {
+                                    graphics.rect(x, y, TILE_SIZE, TILE_SIZE);
+                                    graphics.fill({ color: 0x00ff00, alpha: 0.1 }); // Verde livre
+                                }
+                                graphics.rect(x, y, TILE_SIZE, TILE_SIZE);
+                                graphics.stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
+
+                                // Escrever numero
+                                const tileText = new Text({
+                                    text: tile.toString(),
+                                    style: {
+                                        fontSize: 12,
+                                        fill: tile === 1 ? 0xffcccc : 0xccffcc, // Cor levemente diferente
+                                        fontWeight: 'bold'
+                                    }
+                                });
+                                tileText.x = x + TILE_SIZE / 2 - 5;
+                                tileText.y = y + TILE_SIZE / 2 - 8;
+                                textContainer.addChild(tileText);
+                            });
+                        });
+
+                        debugLayerRef.current.addChild(graphics);
+                        debugLayerRef.current.addChild(textContainer);
                     }
-                    
-                    // Desenhar borda
-                    gridGraphics.rect(x, y, tileSize, tileSize);
-                    gridGraphics.stroke({ color: 0xffffff, width: 1, alpha: 0.5 });
-                    
-                    // Escrever número
-                    const tileText = new Text({
-                        text: tile.toString(),
-                        style: {
-                            fontSize: 16,
-                            fill: tile === 1 ? 0xff0000 : 0x00ff00,
-                            fontWeight: 'bold',
-                        }
-                    });
-                    tileText.x = x + tileSize / 2 - 5;
-                    tileText.y = y + tileSize / 2 - 8;
-                    gridGraphics.addChild(tileText);
-                });
-            });
-            app.stage.addChild(gridGraphics);
+                }
+            };
 
             // Carregar e adicionar personagem
-           // const texture = await Assets.load(loiraImage);
-            //player = new Sprite(texture);
-            //player.x = gameStateRef.current.playerX;
-            //player.y = gameStateRef.current.playerY;
-            //player.width = 80;
-            //player.height = 100;
-            //app.stage.addChild(player);
-            //playerRef.current = player;
-
             const heroTex = await Assets.load(loiraImage);
-            const hero = new Hero(heroTex, gameStateRef.current.playerX, gameStateRef.current.playerY);
+            const hero = new Hero(heroTex, INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
             app.stage.addChild(hero.getSprite());
-            playerRef.current = hero;
+            heroRef.current = hero;
 
-            // Sistema de movimento
-            handleKeyDown = (e) => {
-                if (e.key === 'ArrowRight') {
-                    gameStateRef.current.movingDirection.push('right');
-                    gameStateRef.current.directionHorizontal = 1;
-                } else if (e.key === 'ArrowLeft') {
-                    gameStateRef.current.movingDirection.push('left');
-                    gameStateRef.current.directionHorizontal = -1;
-                } else if (e.key === 'ArrowDown') {
-                    gameStateRef.current.movingDirection.push('down');
-                    gameStateRef.current.directionVertical = 1;
-                } else if (e.key === 'ArrowUp') {
-                    gameStateRef.current.movingDirection.push('up');
-                    gameStateRef.current.directionVertical = -1;
-                }
-            };
-            handleKeyUp = (e) => {
-                if (e.key === 'ArrowRight') {
-                    gameStateRef.current.movingDirection = gameStateRef.current.movingDirection.filter((e) => e != 'right');
-                    gameStateRef.current.directionHorizontal = 1;
-                } else if (e.key === 'ArrowLeft') {
-                    gameStateRef.current.movingDirection = gameStateRef.current.movingDirection.filter((e) => e != 'left');
-                    gameStateRef.current.directionHorizontal = -1;
-                } else if (e.key === 'ArrowDown') {
-                    gameStateRef.current.movingDirection = gameStateRef.current.movingDirection.filter((e) => e != 'down');
-                    gameStateRef.current.directionVertical = 1;
-                } else if (e.key === 'ArrowUp') {
-                    gameStateRef.current.movingDirection = gameStateRef.current.movingDirection.filter((e) => e != 'up');
-                    gameStateRef.current.directionVertical = -1;
-                }
-            };
+            // Adicionar camada de debug POR CIMA de tudo
+            app.stage.addChild(debugLayer);
 
-            window.addEventListener('keydown', handleKeyDown);
-            window.addEventListener('keyup', handleKeyUp);
+            await loadMap('HALLSPAWN', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
 
             // Loop de animação
             app.ticker.add(() => {
                 if (destroyed) return;
-                if (gameStateRef.current.movingDirection.length > 0) {
-                    let newX = gameStateRef.current.playerX;
-                    let newY = gameStateRef.current.playerY;
 
-                    if (gameStateRef.current.movingDirection?.includes('left') || gameStateRef.current.movingDirection?.includes('right')) {
-                        newX += gameStateRef.current.directionHorizontal * CHARACTER_SPEED;
-                    }
-                    if (gameStateRef.current.movingDirection?.includes('up') || gameStateRef.current.movingDirection?.includes('down')) {
-                        newY += gameStateRef.current.directionVertical * CHARACTER_SPEED;
-                    }
+                // O Hero agora gerencia seu próprio input e movimento
+                // Passamos o mapa de colisão do mapa atual
+                hero.update(MAPS[currentMapRef.current]?.collisionMap);
 
-                    // Verificar colisão antes de atualizar posição
-                    if (canMove(newX, newY, 50, 100)) {
-                        gameStateRef.current.playerX = newX;
-                        gameStateRef.current.playerY = newY;
-                    }
+                // Limitar dentro dos limites da tela
+                if (hero.x < 0) hero.x = 0;
+                if (hero.y < 0) hero.y = 0;
+                if (hero.x > CANVAS_WIDTH - HERO_HITBOX_WIDTH) hero.x = CANVAS_WIDTH - HERO_HITBOX_WIDTH;
+                if (hero.y > CANVAS_HEIGHT - HERO_HITBOX_HEIGHT) hero.y = CANVAS_HEIGHT - HERO_HITBOX_HEIGHT;
 
-                    // Limitar dentro dos limites da tela (personagem = 50 de largura, 100 de altura)
-                    if (gameStateRef.current.playerX < 0) gameStateRef.current.playerX = 0;
-                    if (gameStateRef.current.playerY < 0) gameStateRef.current.playerY = 0;
-                    if (gameStateRef.current.playerX > CANVAS_WIDTH - 50) gameStateRef.current.playerX = CANVAS_WIDTH - 50;
-                    if (gameStateRef.current.playerY > CANVAS_HEIGHT - 100) gameStateRef.current.playerY = CANVAS_HEIGHT - 100;
-
-                    hero.getSprite().x = gameStateRef.current.playerX;
-                    hero.getSprite().y = gameStateRef.current.playerY;
-                }
+                // Atualizar posição do sprite
+                hero.updateSpritePosition();
             });
         };
 
@@ -215,13 +156,13 @@ export default function Game() {
 
         return () => {
             destroyed = true;
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
+            if (heroRef.current) {
+                heroRef.current.destroy(); // Remove event listeners do herói
+            }
             if (appRef.current) {
                 appRef.current.destroy(true, { children: true });
                 appRef.current = null;
             }
-            // Remover todos os canvas filhos do container
             if (canvasRef.current) {
                 Array.from(canvasRef.current.childNodes).forEach(node => {
                     if (node.nodeName === 'CANVAS') {

@@ -1,16 +1,22 @@
-export const TILE_SIZE = 32
-export const COLS = 26
-export const ROWS = 17
+export const CANVAS_WIDTH = 800;
+export const CANVAS_HEIGHT = 600;
 
-export const GAME_WIDTH = TILE_SIZE * COLS - TILE_SIZE * 2
-export const GAME_HEIGHT = TILE_SIZE * ROWS - TILE_SIZE * 2
+// O mapa tem 28 colunas e 21 linhas (800x600 4:3)
+export const MAP_COLS = 28;
+export const MAP_ROWS = 21;
 
-export const OFFSET_X = TILE_SIZE
-export const OFFSET_Y = TILE_SIZE / 2
+export const TILE_SIZE = CANVAS_WIDTH / MAP_COLS; // ~28.57px
 
-export const MOVE_SPEED = 0.03
-export const ANIMATION_SPEED = 0.2
-export const DEFAULT_X_POS = TILE_SIZE * 10
-export const DEFAULT_Y_POS = TILE_SIZE * 15
+export const CHARACTER_SPEED = 4;
 
-export const ZOOM = 3
+// Dimensões da hitbox do personagem
+export const HERO_HITBOX_WIDTH = 50;
+export const HERO_HITBOX_HEIGHT = 100;
+
+// Dimensões visuais do personagem (para compensar transparência)
+export const HERO_SPRITE_WIDTH = 120;
+export const HERO_SPRITE_HEIGHT = 140;
+
+// Configuração inicial
+export const INITIAL_PLAYER_X = 100;
+export const INITIAL_PLAYER_Y = 400;

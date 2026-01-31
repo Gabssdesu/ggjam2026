@@ -6,7 +6,7 @@ import { Hero } from '../../Hero/Hero'
 import { Level } from '../../Levels/Level'
 import { Camera } from '../../Camera/Camera' 
 import backgroundAsset from '../../../assets/grass.webp'
-import heroAsset from '../../../assets/loira.png'
+import heroAsset from '../../../assets/heroina.png'
 
 // Registrar componentes Pixi para uso em JSX
 extend({ Container, Sprite })
