@@ -2,9 +2,24 @@ import { COLLISION_MAP } from '../../constants/colision-map'
 import { COLS, TILE_SIZE } from '../../constants/game-world'
 
 export const calculateCanvasSize = () => {
+  const baseWidth = 1280 // Largura base do jogo
+  const baseHeight = 720 // Altura base do jogo
+  
   const width = window.innerWidth
   const height = window.innerHeight
-  return { width, height }
+  
+  // Calcular escala mantendo proporção (aspect ratio)
+  const scaleX = width / baseWidth
+  const scaleY = height / baseHeight
+  const scale = Math.min(scaleX, scaleY)
+  
+  return {
+    width: width, // Usar largura completa da tela
+    height: height, // Usar altura completa da tela
+    baseWidth: baseWidth,
+    baseHeight: baseHeight,
+    scale: scale // Scale para zoom do jogo
+  }
 }
 
 export const calculateNewTarget = (x, y, direction) => {

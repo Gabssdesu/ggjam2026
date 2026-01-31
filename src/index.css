@@ -1,6 +1,17 @@
 *,
-#root{
+#root {
   height: 100%;
+  width: 100%;
   padding: 0;
   margin: 0;
+}
+
+html, body {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden; /* Impede barras de scroll */
+}
+
+canvas {
+  display: block; /* Remove espaço em branco embaixo */
 }
