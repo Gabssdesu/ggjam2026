@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { Application, Sprite, Assets, Graphics, Container, Text } from 'pixi.js';
+import { Heart } from 'lucide-react';
 import loiraImage from '../../assets/heroina.png';
 import { Hero } from '../Hero/Hero.jsx';
 import { Enemy } from '../Enemy/Enemy.jsx';
 import inimigoImage from '../../assets/inimigo.png';
-import MAPS from '../../constants/maps.js'
+import MAPS from '../../constants/maps.js';
 import {
     CANVAS_WIDTH,
     CANVAS_HEIGHT,
@@ -51,6 +52,7 @@ export default function Game() {
                 width: CANVAS_WIDTH,
                 height: CANVAS_HEIGHT,
                 backgroundColor: 0x87ceeb,
+                backgroundAlpha: 1
             });
             appRef.current = app;
 
@@ -61,6 +63,7 @@ export default function Game() {
             // Camada de Debug
             const debugLayer = new Container();
             debugLayerRef.current = debugLayer;
+            debugLayer.visible = false; // Começa invisível
 
             const loadMap = async (mapId, spawnX, spawnY) => {
                 const config = MAPS[mapId];
@@ -256,11 +259,8 @@ export default function Game() {
 
         navigator.clipboard.writeText(matrixString).then(() => {
             alert('Matriz copiada! Cole no arquivo maps.js');
-            console.log(matrixString);
         }).catch(err => {
-            console.error('Erro ao copiar:', err);
-            console.log(matrixString);
-            alert('Erro ao copiar (veja console)');
+            console.error(err);
         });
     };
 
@@ -272,122 +272,113 @@ export default function Game() {
 
     return (
         <div style={{
-            position: 'relative',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#000000ff',
+            backgroundColor: '#050510',
             height: '100vh',
             width: '100vw',
-            fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+            overflow: 'hidden',
+            fontFamily: 'monospace'
         }}>
 
-            {/* UI DE HUD (BORDAS E CORES) */}
+            {/* CONTAINER DO JOGO COM BORDA RETRO */}
             <div style={{
-                position: 'absolute',
-                top: '20px',
-                left: '20px',
-                zIndex: 100,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                // Estilo "Pixel Art" Scale
-                transform: 'scale(2.5)',
-                transformOrigin: 'top left'
+                position: 'relative',
+                width: CANVAS_WIDTH,
+                height: CANVAS_HEIGHT,
+                // Borda estilo moldura retrô
+                border: '8px solid rgb(59, 59, 59)',
+                outline: '4px solid rgb(30, 30, 30)',
+                boxShadow: '0 0 50px rgba(0,0,0,0.8)',
+                backgroundColor: '#000'
             }}>
 
-                {/* 1. HEALTH BAR (3 Divisões Vermelhas) */}
-                <div style={{ display: 'flex', gap: '2px' }}>
-                    {/* Bloco 1 */}
+                {/* CAMADA CANVAS */}
+                <div ref={canvasRef} style={{ width: '100%', height: '100%' }} />
+
+                {/* HUD OVERLAY - Usando Lucide Icons */}
+                <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    left: '20px',
+                    zIndex: 10,
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    filter: 'drop-shadow(2px 2px 0 rgba(0,0,0,0.8))'
+                }}>
+
+                    {/* HEARTS ROW */}
                     <div style={{
-                        width: '20px', height: '10px',
-                        backgroundColor: '#e74c3c', // Vermelho
-                        border: '2px solid #fff',
-                        boxShadow: '1px 1px 0 #000'
-                    }} />
-                    {/* Bloco 2 */}
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center'
+                    }}>
+                        <Heart size={32} fill="#e74c3c" color="#fff" strokeWidth={2} />
+                        <Heart size={32} fill="#e74c3c" color="#fff" strokeWidth={2} />
+                        <Heart size={32} fill="#e74c3c" color="#fff" strokeWidth={2} />
+                    </div>
+
+                    {/* STAMINA BAR CONTAINER */}
                     <div style={{
-                        width: '20px', height: '10px',
-                        backgroundColor: '#e74c3c',
-                        border: '2px solid #fff',
-                        boxShadow: '1px 1px 0 #000'
-                    }} />
-                    {/* Bloco 3 */}
-                    <div style={{
-                        width: '20px', height: '10px',
-                        backgroundColor: '#e74c3c',
-                        border: '2px solid #fff',
-                        boxShadow: '1px 1px 0 #000'
-                    }} />
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                    }}>
+                        <div style={{
+                            color: '#fff',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            textShadow: '2px 2px 0 #000',
+                            letterSpacing: '2px',
+                            marginLeft: '2px'
+                        }}>STAMINA</div>
+
+                        {/* THE BAR FRAME */}
+                        <div style={{
+                            width: '240px',
+                            height: '24px',
+                            backgroundColor: '#2d3436', // Dark frame bg
+                            border: '4px solid #fff', // Borda Branca Grossa
+                            boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8), 4px 4px 0 #000', // Sombra externa dura
+                            position: 'relative',
+                            padding: '2px'
+                        }}>
+                            {/* PREENCHIMENTO DA BARRA */}
+                            <div ref={staminaRef} style={{
+                                width: '100%',
+                                height: '100%',
+                                backgroundColor: '#f1c40f',
+                                backgroundImage: `linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent)`,
+                                backgroundSize: '20px 20px',
+                                boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.4)',
+                                transition: 'width 0.1s linear'
+                            }} />
+                        </div>
+                    </div>
+
                 </div>
 
-                {/* 2. STAMINA BAR (Barra Laranja Contínua) */}
+                {/* DEBUG TOOLS */}
                 <div style={{
-                    width: '64px', // Largura total combinada dos 3 blocos + gaps (20*3 + 4 = 64)
-                    height: '8px',
-                    backgroundColor: '#222', // Fundo escuro quando vazio
-                    border: '2px solid #fff',
-                    boxShadow: '1px 1px 0 #000',
-                    position: 'relative'
+                    position: 'absolute',
+                    top: '10px', right: '10px',
+                    display: 'flex', gap: '5px',
+                    zIndex: 20,
+                    opacity: 0.8
                 }}>
-                    <div ref={staminaRef} style={{
-                        width: '100%',
-                        height: '100%',
-                        backgroundColor: '#f39c12', // Laranja
-                        transition: 'width 0.1s linear'
-                    }} />
+                    <button onClick={toggleDebug} style={{ border: '2px solid white', background: '#2980b9', color: 'white', fontFamily: 'monospace', cursor: 'pointer', fontSize: '10px' }}>DEBUG_VIEW</button>
+                    <button onClick={copyMapToClipboard} style={{ border: '2px solid white', background: '#27ae60', color: 'white', fontFamily: 'monospace', cursor: 'pointer', fontSize: '10px' }}>COPY_MAP</button>
                 </div>
 
             </div>
 
-            <button
-                onClick={copyMapToClipboard}
-                style={{
-                    position: 'absolute',
-                    top: '20px',
-                    right: '20px',
-                    zIndex: 100,
-                    padding: '10px 20px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                }}
-            >
-                COPIAR MATRIZ (Debug)
-            </button>
-
-            <button
-                onClick={toggleDebug}
-                style={{
-                    position: 'absolute',
-                    top: '60px',
-                    right: '20px',
-                    zIndex: 100,
-                    padding: '10px 20px',
-                    backgroundColor: '#2196F3', // Azul
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                }}
-            >
-                TOGGLE DEBUG
-            </button>
-
-            <div ref={canvasRef} style={{
-                border: '3px solid #333',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                // Cursor padrão no canvas para não confundir
-            }} />
+            <div style={{ marginTop: '16px', color: '#7f8c8d', fontSize: '12px' }}>
+                GGJ 2026 PRE-ALPHA
+            </div>
         </div>
     );
 }
