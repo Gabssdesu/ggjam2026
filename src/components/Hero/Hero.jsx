@@ -10,7 +10,7 @@ export class Hero {
     x = 0;
     y = 0;
     lastDirection = 'down'; // Começa olhando pra baixo
-
+            
     // Estados de Input e Movimento
     movingDirection = [];
     directionHorizontal = 1;

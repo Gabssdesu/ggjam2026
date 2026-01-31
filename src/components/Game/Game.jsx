@@ -23,6 +23,7 @@ export default function Game() {
     const currentMapRef = useRef('HALLSPAWN');
     const mapSpriteRef = useRef(null);
     const debugLayerRef = useRef(null);
+    const staminaRef = useRef(null);
 
     const checkCollision = (r1, r2) => {
         return r1.x < r2.x + r2.width &&
@@ -87,7 +88,7 @@ export default function Game() {
                 if (heroRef.current) {
                     heroRef.current.x = spawnX;
                     heroRef.current.y = spawnY;
-                    heroRef.current.updateSpritePosition(); // Atualiza visual imediatamente
+                    heroRef.current.updateSpritePosition();
                 }
 
                 drawDebug(config);
@@ -98,25 +99,22 @@ export default function Game() {
 
                 debugLayerRef.current.removeChildren();
 
-                // container para os textos ficarem por cima
                 const textContainer = new Container();
-                textContainer.eventMode = 'none'; // textos não bloqueiam clique
+                textContainer.eventMode = 'none';
 
                 config.collisionMap.forEach((row, rowIndex) => {
                     row.forEach((tile, colIndex) => {
                         const x = colIndex * TILE_SIZE;
                         const y = rowIndex * TILE_SIZE;
 
-                        // Graphics separado para cada tile para permitir clique individual
                         const tileGraphic = new Graphics();
 
-                        // Desenhar retângulo
                         if (tile === 1) {
                             tileGraphic.rect(0, 0, TILE_SIZE, TILE_SIZE);
-                            tileGraphic.fill({ color: 0xff0000, alpha: 0.3 }); // Vermelho bloqueado
+                            tileGraphic.fill({ color: 0xff0000, alpha: 0.3 });
                         } else {
                             tileGraphic.rect(0, 0, TILE_SIZE, TILE_SIZE);
-                            tileGraphic.fill({ color: 0x00ff00, alpha: 0.1 }); // Verde livre
+                            tileGraphic.fill({ color: 0x00ff00, alpha: 0.1 });
                         }
                         tileGraphic.rect(0, 0, TILE_SIZE, TILE_SIZE);
                         tileGraphic.stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
@@ -124,19 +122,15 @@ export default function Game() {
                         tileGraphic.x = x;
                         tileGraphic.y = y;
 
-                        // Interatividade
                         tileGraphic.eventMode = 'static';
                         tileGraphic.cursor = 'pointer';
                         tileGraphic.on('pointerdown', () => {
-                            // Inverter valor
                             config.collisionMap[rowIndex][colIndex] = tile === 1 ? 0 : 1;
-                            // Redesenhar
                             drawDebug(config);
                         });
 
                         debugLayerRef.current.addChild(tileGraphic);
 
-                        // Escrever numero
                         const tileText = new Text({
                             text: tile.toString(),
                             style: {
@@ -151,7 +145,6 @@ export default function Game() {
                     });
                 });
 
-                // Desenhar Portas para Debug
                 if (config.doors) {
                     const doorsGraphics = new Graphics();
                     config.doors.forEach(door => {
@@ -161,7 +154,7 @@ export default function Game() {
                         const doorH = (door.h || 1) * TILE_SIZE;
 
                         doorsGraphics.rect(doorX, doorY, doorW, doorH);
-                        doorsGraphics.fill({ color: 0x0000ff, alpha: 0.5 }); // Azul para portas
+                        doorsGraphics.fill({ color: 0x0000ff, alpha: 0.5 });
                         doorsGraphics.stroke({ color: 0xffffff, width: 2 });
                     });
                     debugLayerRef.current.addChild(doorsGraphics);
@@ -170,47 +163,42 @@ export default function Game() {
                 debugLayerRef.current.addChild(textContainer);
             };
 
-            // Carregar e adicionar personagem
             const heroTex = await Assets.load(loiraImage);
             const hero = new Hero(heroTex, INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
             app.stage.addChild(hero.getSprite());
             heroRef.current = hero;
 
-            // Carregar e adicionar Inimigo de teste
             const enemyTex = await Assets.load(inimigoImage);
             const enemy = new Enemy(enemyTex, 400, 300);
             app.stage.addChild(enemy.getSprite());
             enemyRef.current = enemy;
 
-            // Adicionar camada de debug POR CIMA de tudo
             app.stage.addChild(debugLayer);
 
             await loadMap('HALLSPAWN', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
 
-            // Loop de animação
             app.ticker.add(() => {
                 if (destroyed) return;
 
-                // O Hero agora gerencia seu próprio input e movimento
                 const currentMapConfig = MAPS[currentMapRef.current];
                 hero.update(currentMapConfig?.collisionMap);
 
-                // Atualizar Inimigo
+                // Atualizar UI
+                if (staminaRef.current) {
+                    staminaRef.current.style.width = `${hero.energia}%`;
+                }
+
                 if (enemyRef.current) {
-                    // Passamos o mapa de colisão E o herói para calcular perseguição
                     enemyRef.current.update(currentMapConfig?.collisionMap, hero);
                 }
 
-                // Limitar dentro dos limites da tela
                 if (hero.x < 0) hero.x = 0;
                 if (hero.y < 0) hero.y = 0;
                 if (hero.x > CANVAS_WIDTH - HERO_HITBOX_WIDTH) hero.x = CANVAS_WIDTH - HERO_HITBOX_WIDTH;
                 if (hero.y > CANVAS_HEIGHT - HERO_HITBOX_HEIGHT) hero.y = CANVAS_HEIGHT - HERO_HITBOX_HEIGHT;
 
-                // Atualizar posição do sprite
                 hero.updateSpritePosition();
 
-                // Verificar Portas
                 if (currentMapConfig?.doors) {
                     const heroRect = {
                         x: hero.x,
@@ -228,9 +216,8 @@ export default function Game() {
                         };
 
                         if (checkCollision(heroRect, doorRect)) {
-                            // Colidiu com a porta!
                             loadMap(door.targetMap, door.spawnX, door.spawnY);
-                            break; // Só entra em uma porta por vez
+                            break;
                         }
                     }
                 }
@@ -242,7 +229,7 @@ export default function Game() {
         return () => {
             destroyed = true;
             if (heroRef.current) {
-                heroRef.current.destroy(); // Limpar listeners do herói
+                heroRef.current.destroy();
             }
             if (appRef.current) {
                 appRef.current.destroy(true, { children: true });
@@ -262,7 +249,6 @@ export default function Game() {
         const currentMap = MAPS[currentMapRef.current];
         if (!currentMap || !currentMap.collisionMap) return;
 
-        // Formatar como array de arrays bonito
         const rows = currentMap.collisionMap.map(row =>
             `            [${row.join(', ')}]`
         );
@@ -273,7 +259,7 @@ export default function Game() {
             console.log(matrixString);
         }).catch(err => {
             console.error('Erro ao copiar:', err);
-            console.log(matrixString); // Fallback
+            console.log(matrixString);
             alert('Erro ao copiar (veja console)');
         });
     };
@@ -293,8 +279,68 @@ export default function Game() {
             justifyContent: 'center',
             backgroundColor: '#000000ff',
             height: '100vh',
-            width: '100vw'
+            width: '100vw',
+            fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif'
         }}>
+
+            {/* UI DE HUD (BORDAS E CORES) */}
+            <div style={{
+                position: 'absolute',
+                top: '20px',
+                left: '20px',
+                zIndex: 100,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                // Estilo "Pixel Art" Scale
+                transform: 'scale(2.5)',
+                transformOrigin: 'top left'
+            }}>
+
+                {/* 1. HEALTH BAR (3 Divisões Vermelhas) */}
+                <div style={{ display: 'flex', gap: '2px' }}>
+                    {/* Bloco 1 */}
+                    <div style={{
+                        width: '20px', height: '10px',
+                        backgroundColor: '#e74c3c', // Vermelho
+                        border: '2px solid #fff',
+                        boxShadow: '1px 1px 0 #000'
+                    }} />
+                    {/* Bloco 2 */}
+                    <div style={{
+                        width: '20px', height: '10px',
+                        backgroundColor: '#e74c3c',
+                        border: '2px solid #fff',
+                        boxShadow: '1px 1px 0 #000'
+                    }} />
+                    {/* Bloco 3 */}
+                    <div style={{
+                        width: '20px', height: '10px',
+                        backgroundColor: '#e74c3c',
+                        border: '2px solid #fff',
+                        boxShadow: '1px 1px 0 #000'
+                    }} />
+                </div>
+
+                {/* 2. STAMINA BAR (Barra Laranja Contínua) */}
+                <div style={{
+                    width: '64px', // Largura total combinada dos 3 blocos + gaps (20*3 + 4 = 64)
+                    height: '8px',
+                    backgroundColor: '#222', // Fundo escuro quando vazio
+                    border: '2px solid #fff',
+                    boxShadow: '1px 1px 0 #000',
+                    position: 'relative'
+                }}>
+                    <div ref={staminaRef} style={{
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#f39c12', // Laranja
+                        transition: 'width 0.1s linear'
+                    }} />
+                </div>
+
+            </div>
+
             <button
                 onClick={copyMapToClipboard}
                 style={{
@@ -319,7 +365,7 @@ export default function Game() {
                 onClick={toggleDebug}
                 style={{
                     position: 'absolute',
-                    top: '60px', // Abaixo do botão copiar
+                    top: '60px',
                     right: '20px',
                     zIndex: 100,
                     padding: '10px 20px',

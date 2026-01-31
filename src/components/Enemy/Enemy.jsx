@@ -19,7 +19,7 @@ export class Enemy {
     // Movimento
     currentVx = 0;
     currentVy = 0;
-    speed = CHARACTER_SPEED * 0.5; // Inimigo mais lento que o herói
+    speed = CHARACTER_SPEED * 0.3; // Inimigo mais lento que o herói
 
     constructor(baseTexture, initialX, initialY) {
         this.x = initialX;
