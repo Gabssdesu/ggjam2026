@@ -1,9 +1,9 @@
-import {Main} from './components/Experience/Experience'
+import Game from './components/Game/Game'
 
 function App() {
   return (
     <>
-     <Main/>
+     <Game/>
     </>
   )
 }
