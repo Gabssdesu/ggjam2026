@@ -1,6 +1,6 @@
 import { AnimatedSprite, Texture, Rectangle } from 'pixi.js';
 import { canMove } from '../../utils/physics';
-import { CHARACTER_SPEED, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT } from '../../constants/game-world';
+import { CHARACTER_SPEED, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, HERO_SPRITE_HEIGHT } from '../../constants/game-world';
 
 export class Hero {
     // Propriedades Visuais
@@ -37,8 +37,8 @@ export class Hero {
         this.ammo--;
 
         // Coordenadas para o tiro sair do "centro" do personagem
-        const spawnX = this.x + 25;
-        const spawnY = this.y + 50;
+        const spawnX = this.x + HERO_HITBOX_WIDTH / 2;
+        const spawnY = this.y - HERO_HITBOX_HEIGHT / 2;
 
         this.onShoot(spawnX, spawnY, this.lastDirection);
     }
@@ -93,7 +93,7 @@ export class Hero {
 
         // Configuração visual
         // Manter proporção original da arte para não achatar
-        const targetHeight = 140;
+        const targetHeight = HERO_SPRITE_HEIGHT;
         const scale = targetHeight / fh;
         this.sprite.scale.set(scale);
         this.updateSpritePosition();
@@ -264,7 +264,7 @@ export class Hero {
     }
 
     updateSpritePosition() {
-        this.sprite.x = this.x + 25; // Centro da hitbox (50/2)
+        this.sprite.x = this.x + HERO_HITBOX_WIDTH / 2; // Centro da hitbox
         this.sprite.y = this.y; // Y já é a base (pés) do personagem
     }
 

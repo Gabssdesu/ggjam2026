@@ -8,7 +8,7 @@ import { Projectile } from '../Projectile/Projectile.js';
 import inimigoImage from '../../assets/inimigo.png';
 import devil1Sound from '../../assets/Devil1.m4a';
 import devil2Sound from '../../assets/Devil2.m4a';
-import inimigoRosaImage from '../../assets/inimigo_rosa.png';
+import inimigoVerdeImage from '../../assets/inimigo-verde.png';
 import healPotionImage from '../../assets/heal_potion.png';
 import MAPS from '../../constants/maps.js';
 import {
@@ -32,7 +32,7 @@ export default function Game() {
     const maskItemRef = useRef(null); // Ref para o item da máscara
     const musicRef = useRef(null); // Referência para o áudio
     const loadMapFuncRef = useRef(null);
-    const currentMapRef = useRef('HALLSPAWN');
+    const currentMapRef = useRef('ENTRADA');
     const debugLayerRef = useRef(null);
     const staminaRef = useRef(null);
     const ammoRef = useRef(null); // Ref para texto de munição
@@ -198,7 +198,7 @@ export default function Game() {
 
                 if (config.spawnEnemies) {
                     const enemyTex = await Assets.load(inimigoImage);
-                    const enemyRosaTex = await Assets.load(inimigoRosaImage);
+                    const enemyRosaTex = await Assets.load(inimigoVerdeImage);
 
                     // Cria todos os inimigos do mapa
                     config.spawnEnemies.forEach((spawn, index) => {
@@ -344,7 +344,7 @@ export default function Game() {
             gameLayer.addChild(hero.getSprite()); // Adiciona na gameLayer
             heroRef.current = hero;
 
-            await loadMap('HALLSPAWN', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
+            await loadMap('ENTRADA', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
 
             app.ticker.add(() => {
                 if (destroyed || (heroRef.current && heroRef.current.vida <= 0)) return;
@@ -417,7 +417,7 @@ export default function Game() {
                             break; // Sai do loop de inimigos pois o projétil já foi destruído
                         }
                     }
-                    
+
                     // Se o projétil foi destruído por colisão, continua para o próximo projétil
                     if (projectileHit) continue;
                 }
@@ -593,12 +593,13 @@ export default function Game() {
             heroRef.current.isInvincible = false;
             heroRef.current.sprite.tint = 0xffffff;
             heroRef.current.sprite.alpha = 1;
+            heroRef.current.ammo = heroRef.current.maxAmmo;
         }
         setHealth(3);
         setGameOver(false);
 
         if (loadMapFuncRef.current) {
-            loadMapFuncRef.current('HALLSPAWN', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
+            loadMapFuncRef.current('ENTRADA', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
         }
 
         // Limpar registro de mortos ao reiniciar o jogo

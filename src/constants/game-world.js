@@ -11,17 +11,17 @@ export const CHARACTER_SPEED = 4;
 
 // Dimensões da hitbox do personagem
 // Y começa na base (pés) e sobe 2.5 blocos para cima
-export const HERO_HITBOX_WIDTH = 50;
-export const HERO_HITBOX_HEIGHT = TILE_SIZE * 2.5; // 2.5 blocos de altura
+export const HERO_HITBOX_WIDTH = 40;
+export const HERO_HITBOX_HEIGHT = TILE_SIZE * 2.0; // 2.0 blocos de altura
 
 // Dimensões da hitbox do inimigo
 export const ENEMY_HITBOX_WIDTH = 50;
 export const ENEMY_HITBOX_HEIGHT = 30; // Altura reduzida como solicitado
 
 // Dimensões visuais do personagem (para compensar transparência)
-export const HERO_SPRITE_WIDTH = 120;
-export const HERO_SPRITE_HEIGHT = 140;
+export const HERO_SPRITE_WIDTH = 96;
+export const HERO_SPRITE_HEIGHT = 112;
 
 // Configuração inicial
-export const INITIAL_PLAYER_X = 100;
+export const INITIAL_PLAYER_X = 373;
 export const INITIAL_PLAYER_Y = 400;
