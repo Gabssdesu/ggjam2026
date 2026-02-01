@@ -4,7 +4,9 @@ import { Heart } from 'lucide-react';
 import loiraImage from '../../assets/heroina.png';
 import { Hero } from '../Hero/Hero.jsx';
 import { Enemy } from '../Enemy/Enemy.jsx';
+import { Projectile } from '../Projectile/Projectile.js';
 import inimigoImage from '../../assets/inimigo.png';
+import inimigoRosaImage from '../../assets/inimigo_rosa.png';
 import MAPS from '../../constants/maps.js';
 import {
     CANVAS_WIDTH,
@@ -23,20 +25,37 @@ export default function Game() {
     const appRef = useRef(null);
     const heroRef = useRef(null);
     const enemiesRef = useRef([]); // Array para múltiplos inimigos
+    const projectilesRef = useRef([]); // Array para projéteis
+    const maskItemRef = useRef(null); // Ref para o item da máscara
     const musicRef = useRef(null); // Referência para o áudio
     const loadMapFuncRef = useRef(null);
     const currentMapRef = useRef('HALLSPAWN');
     const mapSpriteRef = useRef(null);
     const debugLayerRef = useRef(null);
     const staminaRef = useRef(null);
+    const ammoRef = useRef(null); // Ref para texto de munição
+    const globalEnemiesState = useRef({}); // Estado persistente dos inimigos { mapId: [{type, dead, x, y}] }
+
     const [health, setHealth] = useState(3);
     const [gameOver, setGameOver] = useState(false);
+    const [dialog, setDialog] = useState({ open: false, text: '' }); // Estado do Dialog
 
     const checkCollision = (r1, r2) => {
-        return r1.x < r2.x + r2.width &&
+        const hit = r1.x < r2.x + r2.width &&
             r1.x + r1.width > r2.x &&
             r1.y < r2.y + r2.height &&
             r1.y + r1.height > r2.y;
+
+        return hit;
+    };
+
+    // Helper para desenhar hitboxes no debug
+    const drawHitbox = (rect, color, layer) => {
+        if (!layer || !layer.visible) return;
+        const g = new Graphics();
+        g.rect(rect.x, rect.y, rect.width, rect.height);
+        g.stroke({ color: color, width: 2 });
+        layer.addChild(g);
     };
 
     useEffect(() => {
@@ -67,7 +86,15 @@ export default function Game() {
             }
 
             // Camada de Debug
+            // Camadas (Containers) para organizar o Z-Index
+            const mapLayer = new Container();
+            const gameLayer = new Container();
             const debugLayer = new Container();
+
+            app.stage.addChild(mapLayer);
+            app.stage.addChild(gameLayer);
+            app.stage.addChild(debugLayer); // Debug por cima de tudo
+
             debugLayerRef.current = debugLayer;
             debugLayer.visible = false; // Começa invisível
 
@@ -77,10 +104,8 @@ export default function Game() {
 
                 console.log(`Carregando mapa: ${mapId}`);
 
-                // Remover mapa antigo se existir
-                if (mapSpriteRef.current) {
-                    app.stage.removeChild(mapSpriteRef.current);
-                }
+                // Limpar camada do mapa
+                mapLayer.removeChildren();
 
                 // Carregar e adicionar novo mapa
                 const mapaTexture = await Assets.load(config.asset);
@@ -88,9 +113,7 @@ export default function Game() {
                 mapa.width = CANVAS_WIDTH;
                 mapa.height = CANVAS_HEIGHT;
 
-                // Adiciona no índice 0 para ficar atrás do Herói
-                app.stage.addChildAt(mapa, 0);
-                mapSpriteRef.current = mapa;
+                mapLayer.addChild(mapa);
                 currentMapRef.current = mapId;
 
                 // Reposicionar Herói
@@ -124,17 +147,62 @@ export default function Game() {
                     musicRef.current = null;
                 }
 
-                // Gerar inimigos do mapa
+                // Gerar inimigos do mapa com persistência
                 enemiesRef.current.forEach(e => e.destroy());
                 enemiesRef.current = [];
 
                 if (config.spawnEnemies) {
+                    // Se não tiver estado salvo para este mapa, inicializa
+                    if (!globalEnemiesState.current[mapId]) {
+                        globalEnemiesState.current[mapId] = config.spawnEnemies.map(spawn => {
+                            // Sorteio do tipo (0: normal, 1: rosa)
+                            // 50% de chance para cada
+                            const isRosa = Math.random() > 0.5;
+                            return {
+                                x: spawn.x,
+                                y: spawn.y,
+                                type: isRosa ? 'rosa' : 'normal',
+                                dead: false
+                            };
+                        });
+                    }
+
                     const enemyTex = await Assets.load(inimigoImage);
-                    config.spawnEnemies.forEach(spawn => {
-                        const enemy = new Enemy(enemyTex, spawn.x, spawn.y);
-                        app.stage.addChild(enemy.getSprite());
+                    const enemyRosaTex = await Assets.load(inimigoRosaImage);
+
+                    // Cria inimigos baseados no estado salvo
+                    globalEnemiesState.current[mapId].forEach((enemyState) => {
+                        if (enemyState.dead) return; // Não cria se já morreu
+
+                        const texture = enemyState.type === 'rosa' ? enemyRosaTex : enemyTex;
+                        const enemy = new Enemy(texture, enemyState.x, enemyState.y);
+
+                        // Vincula o sprite ao estado para saber qual atualizar ao morrer
+                        enemy.stateReference = enemyState;
+
+                        gameLayer.addChild(enemy.getSprite()); // Adiciona na gameLayer
                         enemiesRef.current.push(enemy);
                     });
+                }
+
+                // Spawnar Máscara se estiver no BEDROOM e ainda não tiver pego
+                // Remove item da máscara anterior se existir de qualquer mapa antigo
+                if (maskItemRef.current) {
+                    maskItemRef.current.destroy();
+                    maskItemRef.current = null;
+                }
+
+                // Spawnar Máscara se estiver no BEDROOM e ainda não tiver pego
+                if (mapId === 'BEDROOM' && !hero.hasWeapon) {
+                    const maskGraphics = new Graphics();
+                    maskGraphics.rect(0, 0, 30, 30);
+                    maskGraphics.fill({ color: 0xff00ff, alpha: 0.5 }); // Magenta semitransparente (hitbox debug)
+                    maskGraphics.stroke({ color: 0xffffff, width: 2 });
+                    maskGraphics.x = 400;
+                    maskGraphics.y = 300;
+
+                    gameLayer.addChild(maskGraphics); // Adiciona na gameLayer
+                    maskItemRef.current = maskGraphics;
                 }
 
                 drawDebug(config);
@@ -212,15 +280,39 @@ export default function Game() {
 
             const heroTex = await Assets.load(loiraImage);
             const hero = new Hero(heroTex, INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
-            app.stage.addChild(hero.getSprite());
-            heroRef.current = hero;
 
-            app.stage.addChild(debugLayer);
+            // Configurar callback do tiro
+            hero.onShoot = (x, y, dir) => {
+                const projectile = new Projectile(x, y, dir);
+                gameLayer.addChild(projectile.sprite); // Adiciona na gameLayer
+                projectilesRef.current.push(projectile);
+            };
+
+            gameLayer.addChild(hero.getSprite()); // Adiciona na gameLayer
+            heroRef.current = hero;
 
             await loadMap('HALLSPAWN', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
 
             app.ticker.add(() => {
                 if (destroyed || (heroRef.current && heroRef.current.vida <= 0)) return;
+
+                // Limpar debug dinâmico (hitboxes móveis)
+                if (debugLayerRef.current && debugLayerRef.current.visible) {
+                    // Remove apenas os não estáticos (que não são do mapa)
+                    // Uma forma simples é remover os últimos filhos se tivermos controle, 
+                    // ou criar um container filho só para dinâmicos.
+                    // Por simplificação, vamos assumir que o drawDebug redesenha o estático se precisarmos limpar tudo
+                    // Mas para performance, vamos criar um container separado dentro do debugLayer na próxima iteração.
+                    // Por enquanto vamos desenhar hitboxes por cima na força bruta para debug
+                    // Para limpar os hitboxes dinâmicos, precisamos de uma referência a eles.
+                    // Uma abordagem é ter um container específico para hitboxes dinâmicos dentro do debugLayer.
+                    // Por enquanto, vamos apenas redesenhar por cima, o que não é ideal para performance mas funciona para debug.
+                    // Para uma limpeza real, precisaríamos armazenar as Graphics criadas por drawHitbox e removê-las.
+                    // Por exemplo:
+                    // dynamicDebugGraphics.forEach(g => g.destroy());
+                    // dynamicDebugGraphics = [];
+                    // Mas isso exigiria uma refatoração maior.
+                }
 
                 const currentMapConfig = MAPS[currentMapRef.current];
                 hero.update(currentMapConfig?.collisionMap);
@@ -229,15 +321,79 @@ export default function Game() {
                 if (staminaRef.current) {
                     staminaRef.current.style.width = `${hero.energia}%`;
                 }
+                if (ammoRef.current) {
+                    ammoRef.current.innerText = hero.hasWeapon ? `${hero.ammo} / ${hero.maxAmmo}` : '';
+                }
 
                 enemiesRef.current.forEach(enemy => {
                     enemy.update(currentMapConfig?.collisionMap, hero);
                 });
 
+                // Atualizar Projéteis
+                for (let i = projectilesRef.current.length - 1; i >= 0; i--) {
+                    const p = projectilesRef.current[i];
+                    p.update();
+
+                    // Remover se sair da tela ou colidir com parede (simples)
+                    if (p.x < 0 || p.x > CANVAS_WIDTH || p.y < 0 || p.y > CANVAS_HEIGHT) {
+                        p.destroy();
+                        projectilesRef.current.splice(i, 1);
+                        continue;
+                    }
+
+                    // Colisão Projétil x Inimigo
+                    const pRect = p.getBounds();
+
+                    for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
+                        const enemy = enemiesRef.current[j];
+                        const eRect = {
+                            x: enemy.x,
+                            y: enemy.y,
+                            width: ENEMY_HITBOX_WIDTH,
+                            height: ENEMY_HITBOX_HEIGHT
+                        };
+
+                        if (checkCollision(pRect, eRect)) {
+                            // Matar Inimigo
+                            if (enemy.stateReference) {
+                                enemy.stateReference.dead = true; // Marca como morto permanentemente
+                            }
+                            enemy.destroy();
+                            enemiesRef.current.splice(j, 1);
+
+                            // Destruir Projétil
+                            p.destroy();
+                            projectilesRef.current.splice(i, 1);
+                            break; // Sai do loop de inimigos pois o projétil já era
+                        }
+                    }
+                }
+
                 if (hero.x < 0) hero.x = 0;
                 if (hero.y < 0) hero.y = 0;
                 if (hero.x > CANVAS_WIDTH - HERO_HITBOX_WIDTH) hero.x = CANVAS_WIDTH - HERO_HITBOX_WIDTH;
                 if (hero.y > CANVAS_HEIGHT - HERO_HITBOX_HEIGHT) hero.y = CANVAS_HEIGHT - HERO_HITBOX_HEIGHT;
+
+                // Checar item da máscara
+                if (maskItemRef.current && !hero.hasWeapon) {
+                    const heroRect = { x: hero.x, y: hero.y, width: HERO_HITBOX_WIDTH, height: HERO_HITBOX_HEIGHT };
+                    const maskRect = { x: maskItemRef.current.x, y: maskItemRef.current.y, width: 30, height: 30 };
+
+                    if (checkCollision(heroRect, maskRect)) {
+                        hero.hasWeapon = true;
+                        hero.addAmmo(5); // Dá 5 munições ao pegar
+
+                        // Remover visualmente e da memória
+                        maskItemRef.current.destroy();
+                        maskItemRef.current = null;
+
+                        setDialog({
+                            open: true,
+                            text: 'MÁSCARA OBTIDA!\nVocê encontrou uma arma antiga.\nPressione Z para atirar.'
+                        });
+                        setTimeout(() => setDialog({ open: false, text: '' }), 4000); // Fecha auto em 4s
+                    }
+                }
 
                 // Colisão com Inimigos
                 enemiesRef.current.forEach(enemy => {
@@ -253,6 +409,12 @@ export default function Game() {
                         width: ENEMY_HITBOX_WIDTH,
                         height: ENEMY_HITBOX_HEIGHT
                     };
+
+                    // Desenhar DEBUG (se ativo)
+                    if (debugLayerRef.current && debugLayerRef.current.visible) {
+                        drawHitbox(heroRect, 0x00ffff, debugLayerRef.current); // Herói Ciano
+                        drawHitbox(enemyRect, 0xff0000, debugLayerRef.current); // Inimigo Vermelho
+                    }
 
                     if (checkCollision(heroRect, enemyRect)) {
                         hero.takeDamage();
@@ -356,6 +518,16 @@ export default function Game() {
         }
     };
 
+    useEffect(() => {
+        const handleAnyKey = () => {
+            if (dialog.open) {
+                setDialog({ ...dialog, open: false });
+            }
+        };
+        window.addEventListener('keydown', handleAnyKey);
+        return () => window.removeEventListener('keydown', handleAnyKey);
+    }, [dialog.open]);
+
     return (
         <div style={{
             display: 'flex',
@@ -456,7 +628,51 @@ export default function Game() {
                         </div>
                     </div>
 
+                    {/* AMMO COUNTER */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '100px', left: '0px',
+                        color: 'cyan',
+                        fontSize: '20px',
+                        fontWeight: 'bold',
+                        textShadow: '2px 2px 0 #000',
+                        fontFamily: 'monospace'
+                    }}>
+                        <span ref={ammoRef}></span>
+                    </div>
+
                 </div>
+
+                {/* DIALOG BOX OVERLAY */}
+                {dialog.open && (
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '20px', left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: '50%',
+                        backgroundColor: 'rgba(0, 0, 100, 0.9)',
+                        border: '4px solid #fff',
+                        boxShadow: '0 0 10px #000, inset 0 0 20px #000',
+                        padding: '10px',
+                        zIndex: 50,
+                        color: '#fff',
+                        fontFamily: 'monospace',
+                        fontSize: '18px',
+                        lineHeight: '1.5',
+                        whiteSpace: 'pre-line'
+                    }}>
+                        {dialog.text}
+                        <div style={{
+                            fontSize: '12px',
+                            textAlign: 'right',
+                            marginTop: '10px',
+                            color: '#aaa',
+                            fontStyle: 'italic'
+                        }}>
+                            Pressione qualquer tecla para fechar...
+                        </div>
+                    </div>
+                )}
 
                 {/* DEBUG TOOLS */}
                 <div style={{
@@ -521,6 +737,6 @@ export default function Game() {
             <div style={{ marginTop: '16px', color: '#7f8c8d', fontSize: '12px' }}>
                 GGJ 2026 PRE-ALPHA
             </div>
-        </div>
+        </div >
     );
 }

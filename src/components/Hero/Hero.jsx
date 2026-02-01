@@ -24,13 +24,45 @@ export class Hero {
     // Propriedades
     energia = 100;
     vida = 3;
-    isInvincible = false;
-    invincibilityTimer = 0;
-    invincibilityDuration = 120; // Aproximadamente 2 segundos a 60fps
+    hasWeapon = false; // Começa sem arma
+    ammo = 0; // Munição atual
+    maxAmmo = 10; // Máximo de munição
+    onShoot = null; // Callback para criar projéteis
+
+    // ... (rest of properties)
+
+    shoot() {
+        if (!this.hasWeapon || !this.onShoot || this.ammo <= 0) return;
+
+        this.ammo--;
+
+        // Coordenadas para o tiro sair do "centro" do personagem
+        const spawnX = this.x + 25;
+        const spawnY = this.y + 50;
+
+        this.onShoot(spawnX, spawnY, this.lastDirection);
+    }
+
+    addAmmo(amount) {
+        this.ammo += amount;
+        if (this.ammo > this.maxAmmo) this.ammo = this.maxAmmo;
+    }
 
     constructor(baseTexture, initialX, initialY) {
         this.x = initialX;
         this.y = initialY;
+
+        // Inicializações explícitas para garantir
+        this.energia = 100;
+        this.vida = 3;
+        this.hasWeapon = false;
+        this.ammo = 0;
+        this.maxAmmo = 10;
+        this.isInvincible = false;
+        this.invincibilityTimer = 0;
+        this.invincibilityDuration = 120; // 2 segundos
+        this.movingDirection = [];
+        this.lastDirection = 'down';
 
         // Configuração do sprite sheet
         const cols = 24;
@@ -87,6 +119,8 @@ export class Hero {
             }
             else if (key == 'Shift') {
                 this.isRunning = true;
+            } else if (key === 'z' || key === 'Z') {
+                this.shoot();
             }
         };
 
@@ -126,12 +160,30 @@ export class Hero {
     }
 
     update(collisionMap) {
+        // --- SISTEMA DE DANO E INVENCIBILIDADE ---
+        if (this.isInvincible) {
+            this.invincibilityTimer--;
+
+            // Log a cada 60 frames (aprox 1 seg) para não flodar
+            if (this.invincibilityTimer % 60 === 0) {
+                console.log(`Invencível. Timer: ${this.invincibilityTimer}`);
+            }
+
+            // Efeito visual de piscar
+            this.sprite.alpha = (Math.floor(this.invincibilityTimer / 5) % 2 === 0) ? 0.5 : 1;
+
+            if (this.invincibilityTimer <= 0) {
+                this.isInvincible = false;
+                this.sprite.alpha = 1;
+                console.log("Invencibilidade acabou.");
+            }
+        }
+
         let vx = 0;
         let vy = 0;
         let nextAnim = '';
 
         // Determinar velocidade baseada no input
-
         const isRight = this.movingDirection.includes('right');
         const isLeft = this.movingDirection.includes('left');
         const isUp = this.movingDirection.includes('up');
@@ -147,18 +199,6 @@ export class Hero {
             const factor = 1 / Math.sqrt(2);
             vx *= factor;
             vy *= factor;
-        }
-
-        // --- SISTEMA DE DANO E INVENCIBILIDADE ---
-        if (this.isInvincible) {
-            this.invincibilityTimer--;
-            // Efeito visual de piscar
-            this.sprite.alpha = (Math.floor(this.invincibilityTimer / 5) % 2 === 0) ? 0.5 : 1;
-
-            if (this.invincibilityTimer <= 0) {
-                this.isInvincible = false;
-                this.sprite.alpha = 1;
-            }
         }
 
         // --- SISTEMA DE ENERGIA ---
@@ -227,6 +267,8 @@ export class Hero {
         this.sprite.x = this.x + 25; // Centro da hitbox (50/2)
         this.sprite.y = this.y + 100; // Base da hitbox (100)
     }
+
+
 
     takeDamage() {
         if (this.isInvincible || this.vida <= 0) return;
