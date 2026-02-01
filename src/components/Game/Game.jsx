@@ -5,6 +5,8 @@ import loiraImage from '../../assets/heroina.png';
 import { Hero } from '../Hero/Hero.jsx';
 import { Enemy } from '../Enemy/Enemy.jsx';
 import inimigoImage from '../../assets/inimigo.png';
+import devil1Sound from '../../assets/Devil1.m4a';
+import devil2Sound from '../../assets/Devil2.m4a';
 import MAPS from '../../constants/maps.js';
 import {
     CANVAS_WIDTH,
@@ -31,6 +33,12 @@ export default function Game() {
     const staminaRef = useRef(null);
     const [health, setHealth] = useState(3);
     const [gameOver, setGameOver] = useState(false);
+    const gameOverRef = useRef(false);
+
+    // Sincronizar ref com state
+    useEffect(() => {
+        gameOverRef.current = gameOver;
+    }, [gameOver]);
 
     const checkCollision = (r1, r2) => {
         return r1.x < r2.x + r2.width &&
@@ -42,6 +50,32 @@ export default function Game() {
     useEffect(() => {
         let destroyed = false;
         let app;
+        let ambientSoundTimeout;
+
+        const playAmbientSound = () => {
+            if (destroyed || gameOverRef.current) {
+                // Se o jogo acabou, tenta agendar de novo para quando o jogo reiniciar
+                // ou apenas para se destruído
+                if (!destroyed) {
+                    ambientSoundTimeout = setTimeout(playAmbientSound, 5000);
+                }
+                return;
+            }
+
+            const sounds = [devil1Sound, devil2Sound];
+            const randomSound = sounds[Math.floor(Math.random() * sounds.length)];
+
+            const audio = new Audio(randomSound);
+            audio.volume = 0.3; // Volume mais baixo para ser um susto sutil
+            audio.play().catch(e => console.log("Áudio ambiente bloqueado"));
+
+            // Agenda o próximo som entre 15 e 45 segundos
+            const nextTime = Math.random() * 10000 + 15000;
+            ambientSoundTimeout = setTimeout(playAmbientSound, nextTime);
+        };
+
+        // Inicia o ciclo de sons ambientes após 10 segundos
+        ambientSoundTimeout = setTimeout(playAmbientSound, 10000);
 
         const setup = async () => {
             if (canvasRef.current) {
@@ -301,6 +335,9 @@ export default function Game() {
             if (musicRef.current) {
                 musicRef.current.pause();
                 musicRef.current = null;
+            }
+            if (ambientSoundTimeout) {
+                clearTimeout(ambientSoundTimeout);
             }
             if (appRef.current) {
                 appRef.current.destroy(true, { children: true });
