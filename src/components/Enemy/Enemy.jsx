@@ -132,10 +132,10 @@ export class Enemy {
 
             // 1. Verificar limites da tela
             if (nextX < 0 || nextX > CANVAS_WIDTH - ENEMY_HITBOX_WIDTH) collided = true;
-            if (nextY < 0 || nextY > CANVAS_HEIGHT - ENEMY_HITBOX_HEIGHT) collided = true;
+            if (nextY - ENEMY_HITBOX_HEIGHT < 0 || nextY > CANVAS_HEIGHT) collided = true;
 
-            // 2. Verificar colisão com paredes
-            if (!collided && !canMove(nextX, nextY, ENEMY_HITBOX_WIDTH, ENEMY_HITBOX_HEIGHT, collisionMap)) {
+            // 2. Verificar colisão com paredes (Y é a base, então topo é Y - altura)
+            if (!collided && !canMove(nextX, nextY - ENEMY_HITBOX_HEIGHT, ENEMY_HITBOX_WIDTH, ENEMY_HITBOX_HEIGHT, collisionMap)) {
                 collided = true;
             }
 
@@ -181,14 +181,14 @@ export class Enemy {
     // Helper para verificar colisão simples usada no deslize
     canMoveSafely(tx, ty, collisionMap) {
         if (tx < 0 || tx > CANVAS_WIDTH - ENEMY_HITBOX_WIDTH) return false;
-        if (ty < 0 || ty > CANVAS_HEIGHT - ENEMY_HITBOX_HEIGHT) return false;
-        return canMove(tx, ty, ENEMY_HITBOX_WIDTH, ENEMY_HITBOX_HEIGHT, collisionMap);
+        if (ty - ENEMY_HITBOX_HEIGHT < 0 || ty > CANVAS_HEIGHT) return false;
+        return canMove(tx, ty - ENEMY_HITBOX_HEIGHT, ENEMY_HITBOX_WIDTH, ENEMY_HITBOX_HEIGHT, collisionMap);
     }
 
     updateSpritePosition() {
-        // Agora o sprite é posicionado em relação ao CENTRO da hitbox
+        // Y é a base (pés) do inimigo, sprite é centrado horizontalmente
         this.sprite.x = this.x + ENEMY_HITBOX_WIDTH / 2;
-        this.sprite.y = this.y + ENEMY_HITBOX_HEIGHT + 20; // Ajuste para descer o sprite em relação à hitbox
+        this.sprite.y = this.y; // Y já é a base
     }
 
     getSprite() { return this.sprite; }

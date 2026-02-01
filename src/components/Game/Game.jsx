@@ -33,11 +33,11 @@ export default function Game() {
     const musicRef = useRef(null); // Referência para o áudio
     const loadMapFuncRef = useRef(null);
     const currentMapRef = useRef('HALLSPAWN');
-    const mapSpriteRef = useRef(null);
     const debugLayerRef = useRef(null);
     const staminaRef = useRef(null);
     const ammoRef = useRef(null); // Ref para texto de munição
     const healthPotionsRef = useRef([]); // Array para poções de vida dropadas
+    const deadEnemiesRef = useRef(new Set()); // Set para armazenar IDs de inimigos mortos
 
     const [health, setHealth] = useState(3);
     const [gameOver, setGameOver] = useState(false);
@@ -88,7 +88,7 @@ export default function Game() {
 
             const audio = new Audio(randomSound);
             audio.volume = 0.3; // Volume mais baixo para ser um susto sutil
-            audio.play().catch(e => console.log("Áudio ambiente bloqueado"));
+            audio.play();
 
             // Agenda o próximo som entre 15 e 45 segundos
             const nextTime = Math.random() * 10000 + 15000;
@@ -126,10 +126,15 @@ export default function Game() {
             const mapLayer = new Container();
             const gameLayer = new Container();
             const debugLayer = new Container();
+            const staticDebugLayer = new Container(); // Grid do mapa (estático)
+            const dynamicDebugLayer = new Container(); // Hitboxes (dinâmico)
 
             app.stage.addChild(mapLayer);
             app.stage.addChild(gameLayer);
             app.stage.addChild(debugLayer); // Debug por cima de tudo
+
+            debugLayer.addChild(staticDebugLayer);
+            debugLayer.addChild(dynamicDebugLayer);
 
             debugLayerRef.current = debugLayer;
             debugLayer.visible = false; // Começa invisível
@@ -177,7 +182,7 @@ export default function Game() {
                         nextMusic.volume = 0.5; // Volume médio por padrão
 
                         // Tentar tocar (browser pode bloquear sem interação inicial)
-                        nextMusic.play().catch(e => console.warn("Música bloqueada pelo browser. Clique no jogo para ouvir."));
+                        nextMusic.play();
 
                         musicRef.current = nextMusic;
                     }
@@ -196,12 +201,23 @@ export default function Game() {
                     const enemyRosaTex = await Assets.load(inimigoRosaImage);
 
                     // Cria todos os inimigos do mapa
-                    config.spawnEnemies.forEach((spawn) => {
+                    config.spawnEnemies.forEach((spawn, index) => {
+                        const enemyId = `${mapId}-enemy-${index}`;
+
+                        // Se o inimigo já foi morto, não respawna
+                        if (deadEnemiesRef.current.has(enemyId)) return;
+
                         // Sorteio do tipo (0: normal, 1: rosa)
                         // 50% de chance para cada
                         const isRosa = Math.random() > 0.5;
                         const texture = isRosa ? enemyRosaTex : enemyTex;
-                        const enemy = new Enemy(texture, spawn.x, spawn.y);
+
+                        // Converter grade para pixels
+                        const spawnX = spawn.col * TILE_SIZE;
+                        const spawnY = spawn.row * TILE_SIZE;
+
+                        const enemy = new Enemy(texture, spawnX, spawnY);
+                        enemy.id = enemyId; // Atribui ID ao inimigo
 
                         gameLayer.addChild(enemy.getSprite());
                         enemiesRef.current.push(enemy);
@@ -233,9 +249,9 @@ export default function Game() {
             loadMapFuncRef.current = loadMap;
 
             const drawDebug = (config) => {
-                if (!debugLayerRef.current || !config.collisionMap) return;
+                if (!staticDebugLayer || !config.collisionMap) return;
 
-                debugLayerRef.current.removeChildren();
+                staticDebugLayer.removeChildren();
 
                 const textContainer = new Container();
                 textContainer.eventMode = 'none';
@@ -267,7 +283,7 @@ export default function Game() {
                             drawDebug(config);
                         });
 
-                        debugLayerRef.current.addChild(tileGraphic);
+                        staticDebugLayer.addChild(tileGraphic);
 
                         const tileText = new Text({
                             text: tile.toString(),
@@ -295,10 +311,10 @@ export default function Game() {
                         doorsGraphics.fill({ color: 0x0000ff, alpha: 0.5 });
                         doorsGraphics.stroke({ color: 0xffffff, width: 2 });
                     });
-                    debugLayerRef.current.addChild(doorsGraphics);
+                    staticDebugLayer.addChild(doorsGraphics);
                 }
 
-                debugLayerRef.current.addChild(textContainer);
+                staticDebugLayer.addChild(textContainer);
             };
 
             const heroTex = await Assets.load(loiraImage);
@@ -335,20 +351,7 @@ export default function Game() {
 
                 // Limpar debug dinâmico (hitboxes móveis)
                 if (debugLayerRef.current && debugLayerRef.current.visible) {
-                    // Remove apenas os não estáticos (que não são do mapa)
-                    // Uma forma simples é remover os últimos filhos se tivermos controle, 
-                    // ou criar um container filho só para dinâmicos.
-                    // Por simplificação, vamos assumir que o drawDebug redesenha o estático se precisarmos limpar tudo
-                    // Mas para performance, vamos criar um container separado dentro do debugLayer na próxima iteração.
-                    // Por enquanto vamos desenhar hitboxes por cima na força bruta para debug
-                    // Para limpar os hitboxes dinâmicos, precisamos de uma referência a eles.
-                    // Uma abordagem é ter um container específico para hitboxes dinâmicos dentro do debugLayer.
-                    // Por enquanto, vamos apenas redesenhar por cima, o que não é ideal para performance mas funciona para debug.
-                    // Para uma limpeza real, precisaríamos armazenar as Graphics criadas por drawHitbox e removê-las.
-                    // Por exemplo:
-                    // dynamicDebugGraphics.forEach(g => g.destroy());
-                    // dynamicDebugGraphics = [];
-                    // Mas isso exigiria uma refatoração maior.
+                    dynamicDebugLayer.removeChildren();
                 }
 
                 const currentMapConfig = MAPS[currentMapRef.current];
@@ -380,19 +383,28 @@ export default function Game() {
 
                     // Colisão Projétil x Inimigo
                     const pRect = p.getBounds();
+                    let projectileHit = false;
 
                     for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
                         const enemy = enemiesRef.current[j];
-                        const eRect = {
+
+                        // Hitbox de DANO do inimigo
+                        // Y é a base (pés) e a hitbox sobe até a altura total
+                        const damageRect = {
                             x: enemy.x,
-                            y: enemy.y,
+                            y: enemy.y - ENEMY_HITBOX_HEIGHT, // Sobe da base
                             width: ENEMY_HITBOX_WIDTH,
                             height: ENEMY_HITBOX_HEIGHT
                         };
 
-                        if (checkCollision(pRect, eRect)) {
+                        if (checkCollision(pRect, damageRect)) {
                             // Dropar poção de vida na posição do inimigo
                             dropHealthPotion(enemy.x, enemy.y);
+
+                            // Registrar morte
+                            if (enemy.id) {
+                                deadEnemiesRef.current.add(enemy.id);
+                            }
 
                             // Matar Inimigo
                             enemy.destroy();
@@ -401,19 +413,23 @@ export default function Game() {
                             // Destruir Projétil
                             p.destroy();
                             projectilesRef.current.splice(i, 1);
-                            break; // Sai do loop de inimigos pois o projétil já era
+                            projectileHit = true;
+                            break; // Sai do loop de inimigos pois o projétil já foi destruído
                         }
                     }
+                    
+                    // Se o projétil foi destruído por colisão, continua para o próximo projétil
+                    if (projectileHit) continue;
                 }
 
                 if (hero.x < 0) hero.x = 0;
-                if (hero.y < 0) hero.y = 0;
+                if (hero.y < HERO_HITBOX_HEIGHT) hero.y = HERO_HITBOX_HEIGHT; // Y é a base, mínimo é a altura
                 if (hero.x > CANVAS_WIDTH - HERO_HITBOX_WIDTH) hero.x = CANVAS_WIDTH - HERO_HITBOX_WIDTH;
-                if (hero.y > CANVAS_HEIGHT - HERO_HITBOX_HEIGHT) hero.y = CANVAS_HEIGHT - HERO_HITBOX_HEIGHT;
+                if (hero.y > CANVAS_HEIGHT) hero.y = CANVAS_HEIGHT; // Y é a base, pode ir até a borda inferior
 
                 // Checar item da máscara
                 if (maskItemRef.current && !hero.hasWeapon) {
-                    const heroRect = { x: hero.x, y: hero.y, width: HERO_HITBOX_WIDTH, height: HERO_HITBOX_HEIGHT };
+                    const heroRect = { x: hero.x, y: hero.y - HERO_HITBOX_HEIGHT, width: HERO_HITBOX_WIDTH, height: HERO_HITBOX_HEIGHT };
                     const maskRect = { x: maskItemRef.current.x, y: maskItemRef.current.y, width: 30, height: 30 };
 
                     if (checkCollision(heroRect, maskRect)) {
@@ -436,7 +452,7 @@ export default function Game() {
                 const heroRect = { x: hero.x, y: hero.y, width: HERO_HITBOX_WIDTH, height: HERO_HITBOX_HEIGHT };
                 for (let i = healthPotionsRef.current.length - 1; i >= 0; i--) {
                     const potion = healthPotionsRef.current[i];
-                    const potionRect = { x: potion.x, y: potion.y, width: 50, height: 50 };
+                    const potionRect = { x: potion.x, y: potion.y - 50, width: 50, height: 50 }; // Y é a base
 
                     if (checkCollision(heroRect, potionRect)) {
                         // Curar meio coração (0.5 de vida), máximo 3
@@ -455,21 +471,21 @@ export default function Game() {
                 enemiesRef.current.forEach(enemy => {
                     const heroRect = {
                         x: hero.x,
-                        y: hero.y,
+                        y: hero.y - HERO_HITBOX_HEIGHT, // Y é a base, sobe para cima
                         width: HERO_HITBOX_WIDTH,
                         height: HERO_HITBOX_HEIGHT
                     };
                     const enemyRect = {
                         x: enemy.x,
-                        y: enemy.y,
+                        y: enemy.y - ENEMY_HITBOX_HEIGHT, // Y é a base, sobe para cima
                         width: ENEMY_HITBOX_WIDTH,
                         height: ENEMY_HITBOX_HEIGHT
                     };
 
                     // Desenhar DEBUG (se ativo)
                     if (debugLayerRef.current && debugLayerRef.current.visible) {
-                        drawHitbox(heroRect, 0x00ffff, debugLayerRef.current); // Herói Ciano
-                        drawHitbox(enemyRect, 0xff0000, debugLayerRef.current); // Inimigo Vermelho
+                        drawHitbox(heroRect, 0x00ffff, dynamicDebugLayer); // Herói Ciano
+                        drawHitbox(enemyRect, 0xff0000, dynamicDebugLayer); // Inimigo Vermelho
                     }
 
                     if (checkCollision(heroRect, enemyRect)) {
@@ -486,7 +502,7 @@ export default function Game() {
                 if (currentMapConfig?.doors) {
                     const heroRect = {
                         x: hero.x,
-                        y: hero.y,
+                        y: hero.y - HERO_HITBOX_HEIGHT, // Y é a base, sobe para cima
                         width: HERO_HITBOX_WIDTH,
                         height: HERO_HITBOX_HEIGHT
                     };
@@ -500,7 +516,15 @@ export default function Game() {
                         };
 
                         if (checkCollision(heroRect, doorRect)) {
-                            loadMap(door.targetMap, door.spawnX, door.spawnY);
+                            let targetX = door.spawnX;
+                            let targetY = door.spawnY;
+
+                            if (door.spawnCol !== undefined && door.spawnRow !== undefined) {
+                                targetX = door.spawnCol * TILE_SIZE;
+                                targetY = door.spawnRow * TILE_SIZE;
+                            }
+
+                            loadMap(door.targetMap, targetX, targetY);
                             break;
                         }
                     }
@@ -576,11 +600,19 @@ export default function Game() {
         if (loadMapFuncRef.current) {
             loadMapFuncRef.current('HALLSPAWN', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
         }
+
+        // Limpar registro de mortos ao reiniciar o jogo
+        deadEnemiesRef.current.clear();
     };
 
     useEffect(() => {
-        const handleAnyKey = () => {
+        const handleAnyKey = (e) => {
             if (dialog.open) {
+                // Ignorar teclas de controle do personagem
+                const controlKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', 'z', 'Z', 'w', 'W', 'a', 'A', 's', 'S', 'd', 'D'];
+                if (controlKeys.includes(e.key)) {
+                    return; // Não fecha o diálogo
+                }
                 setDialog({ ...dialog, open: false });
             }
         };

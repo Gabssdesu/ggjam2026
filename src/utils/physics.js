@@ -14,20 +14,19 @@ export const canMove = (newX, newY, width, height, collisionMap) => {
     // quando se está perfeitamente alinhado
     const offset = 1;
 
-    const corners = [
-        { x: newX + offset, y: newY + offset },
-        { x: newX + width - offset, y: newY + offset },
-        { x: newX + offset, y: newY + height - offset },
-        { x: newX + width - offset, y: newY + height - offset }
-    ];
+    // Check all tiles that overlap with the hitbox
+    const startCol = Math.floor((newX + offset) / TILE_SIZE);
+    const endCol = Math.floor((newX + width - offset) / TILE_SIZE);
+    const startRow = Math.floor((newY + offset) / TILE_SIZE);
+    const endRow = Math.floor((newY + height - offset) / TILE_SIZE);
 
-    for (let corner of corners) {
-        const col = Math.floor(corner.x / TILE_SIZE);
-        const row = Math.floor(corner.y / TILE_SIZE);
-
-        if (collisionMap?.[row]?.[col] === 1) {
-            return false; // Colidiu com obstáculo
+    for (let row = startRow; row <= endRow; row++) {
+        for (let col = startCol; col <= endCol; col++) {
+            if (collisionMap?.[row]?.[col] === 1) {
+                return false; // Collision detected
+            }
         }
     }
-    return true; // Pode se mover
+
+    return true; // Safe to move
 };

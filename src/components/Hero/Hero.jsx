@@ -103,39 +103,39 @@ export class Hero {
 
     setupInput() {
         this.handleKeyDown = (e) => {
-            const key = e.key;
-            if (key === 'ArrowRight') {
+            const key = e.key.toLowerCase();
+            if (key === 'arrowright' || key === 'd') {
                 this.movingDirection.push('right');
                 this.directionHorizontal = 1;
-            } else if (key === 'ArrowLeft') {
+            } else if (key === 'arrowleft' || key === 'a') {
                 this.movingDirection.push('left');
                 this.directionHorizontal = -1;
-            } else if (key === 'ArrowDown') {
+            } else if (key === 'arrowdown' || key === 's') {
                 this.movingDirection.push('down');
                 this.directionVertical = 1;
-            } else if (key === 'ArrowUp') {
+            } else if (key === 'arrowup' || key === 'w') {
                 this.movingDirection.push('up');
                 this.directionVertical = -1;
             }
-            else if (key == 'Shift') {
+            else if (key == 'shift') {
                 this.isRunning = true;
-            } else if (key === 'z' || key === 'Z') {
+            } else if (key === 'z') {
                 this.shoot();
             }
         };
 
         this.handleKeyUp = (e) => {
-            const key = e.key;
-            if (key === 'ArrowRight') {
+            const key = e.key.toLowerCase();
+            if (key === 'arrowright' || key === 'd') {
                 this.movingDirection = this.movingDirection.filter(k => k !== 'right');
-            } else if (key === 'ArrowLeft') {
+            } else if (key === 'arrowleft' || key === 'a') {
                 this.movingDirection = this.movingDirection.filter(k => k !== 'left');
-            } else if (key === 'ArrowDown') {
+            } else if (key === 'arrowdown' || key === 's') {
                 this.movingDirection = this.movingDirection.filter(k => k !== 'down');
-            } else if (key === 'ArrowUp') {
+            } else if (key === 'arrowup' || key === 'w') {
                 this.movingDirection = this.movingDirection.filter(k => k !== 'up');
             }
-            else if (key == 'Shift') {
+            else if (key == 'shift') {
                 this.isRunning = false;
             }
         };
@@ -239,16 +239,16 @@ export class Hero {
             const nextX = this.x + vx;
             const nextY = this.y + vy;
 
-            // Verificar colisão
-            if (canMove(nextX, nextY, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, collisionMap)) {
+            // Verificar colisão (Y é a base, então o topo é Y - altura)
+            if (canMove(nextX, nextY - HERO_HITBOX_HEIGHT, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, collisionMap)) {
                 this.x = nextX;
                 this.y = nextY;
             } else {
                 // Tenta deslizar (movimento eixo por eixo)
-                if (vx !== 0 && canMove(this.x + vx, this.y, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, collisionMap)) {
+                if (vx !== 0 && canMove(this.x + vx, this.y - HERO_HITBOX_HEIGHT, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, collisionMap)) {
                     this.x += vx;
                 }
-                else if (vy !== 0 && canMove(this.x, this.y + vy, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, collisionMap)) {
+                else if (vy !== 0 && canMove(this.x, this.y + vy - HERO_HITBOX_HEIGHT, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, collisionMap)) {
                     this.y += vy;
                 }
             }
@@ -265,7 +265,7 @@ export class Hero {
 
     updateSpritePosition() {
         this.sprite.x = this.x + 25; // Centro da hitbox (50/2)
-        this.sprite.y = this.y + 100; // Base da hitbox (100)
+        this.sprite.y = this.y; // Y já é a base (pés) do personagem
     }
 
 

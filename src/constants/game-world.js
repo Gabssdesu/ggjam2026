@@ -10,8 +10,9 @@ export const TILE_SIZE = CANVAS_WIDTH / MAP_COLS; // ~28.57px
 export const CHARACTER_SPEED = 4;
 
 // Dimensões da hitbox do personagem
+// Y começa na base (pés) e sobe 2.5 blocos para cima
 export const HERO_HITBOX_WIDTH = 50;
-export const HERO_HITBOX_HEIGHT = 100;
+export const HERO_HITBOX_HEIGHT = TILE_SIZE * 2.5; // 2.5 blocos de altura
 
 // Dimensões da hitbox do inimigo
 export const ENEMY_HITBOX_WIDTH = 50;
