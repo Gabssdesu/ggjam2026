@@ -1,16 +1,47 @@
-# React + Vite
+# 🎭 Spooky Masks Adventure
+> ⚙️ **Ainda em Desenvolvimento** - Este projeto está em fase ativa de desenvolvimento.
+Uma aventura 2D envolvente em um estilo top-down ambientado em uma mansão assombrada infestada de espíritos malevolentes e segredos ocultos.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 📖 Sobre o Jogo
 
-Currently, two official plugins are available:
+Você assume o controle de uma protagonista determinada que explora corredores escuros, descobre mistérios e wields máscaras mágicas com poderes únicos. Para ter sucesso, ela deve exorcizar os espíritos inquietos que assombram a mansão e resgatar seu amor das garras sobrenaturais que aprisionam o lugar.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 📸 Galeria de Imagens
 
-## React Compiler
+![Gameplay Screenshot 1](https://ggjv4.s3.us-west-1.amazonaws.com/files/styles/flexslider_full/s3/games/2026/863630/screenshot/Captura%20de%20tela%202026-02-01%20191754.png?VersionId=EsBy_WI.iMZDQ..ofR.aNiPRpAD0OTsY&itok=isVRgJ64)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+![Gameplay Screenshot 2](https://ggjv4.s3.us-west-1.amazonaws.com/files/styles/flexslider_full/s3/games/2026/863630/screenshot/Captura%20de%20tela%202026-02-01%20191725.png?VersionId=lvpoZXa9NyP8Yij0P01M9b7huVMb8jZc&itok=M_i47OfF)
 
-## Expanding the ESLint configuration
+![Gameplay Screenshot 3](https://ggjv4.s3.us-west-1.amazonaws.com/files/styles/flexslider_full/s3/games/2026/863630/screenshot/Captura%20de%20tela%202026-02-01%20191706.png?VersionId=N47SvqTlqzFUWDqBFOMgY_kC61g5xKYw&itok=vk1zqe3J)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🎮 Recursos
+
+- ✨ Explore uma mansão assombrada cheia de mistérios
+- 🎭 Coleta e use máscaras mágicas com poderes únicos
+- 👻 Enfrente espíritos malevolentes em combate
+- 🔍 Descubra segredos ocultos na mansão
+- 💫 Gameplay envolvente e atmosfera assustadora
+
+## 🛠️ Tecnologia
+
+- **Frontend**: React.JS
+- **Gráficos**: Pixi.js
+- **Build**: Vite
+- **Plataforma**: Web
+
+## 🌐 Idiomas
+
+- Português, Brasil (Português, Brasil)
+
+## 🚀 Como Executar
+
+```bash
+# Instalar dependências
+npm install
+
+# Iniciar servidor de desenvolvimento
+npm run dev
+
+# Build para produção
+npm run build
+```

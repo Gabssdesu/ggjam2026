@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Application, Sprite, Assets, Graphics, Container, Text } from 'pixi.js';
+import { Application, Sprite, Assets, Graphics, Container, Text, Texture, Rectangle } from 'pixi.js';
 import { Heart } from 'lucide-react';
 import loiraImage from '../../assets/heroina.png';
+import loiraMascaraImage from '../../assets/loira-com-mascara.png';
+import mascaraItemImage from '../../assets/mascara-de-combate2.png';
 import { Hero } from '../Hero/Hero.jsx';
 import { Enemy } from '../Enemy/Enemy.jsx';
 import { Projectile } from '../Projectile/Projectile.js';
@@ -33,11 +35,12 @@ export default function Game() {
     const musicRef = useRef(null); // Referência para o áudio
     const loadMapFuncRef = useRef(null);
     const currentMapRef = useRef('ENTRADA');
-    const debugLayerRef = useRef(null);
+
     const staminaRef = useRef(null);
     const ammoRef = useRef(null); // Ref para texto de munição
     const healthPotionsRef = useRef([]); // Array para poções de vida dropadas
     const deadEnemiesRef = useRef(new Set()); // Set para armazenar IDs de inimigos mortos
+    const texturesRef = useRef({ normal: null, weapon: null }); // Armazena texturas para troca
 
     const [health, setHealth] = useState(3);
     const [gameOver, setGameOver] = useState(false);
@@ -59,14 +62,7 @@ export default function Game() {
         return hit;
     };
 
-    // Helper para desenhar hitboxes no debug
-    const drawHitbox = (rect, color, layer) => {
-        if (!layer || !layer.visible) return;
-        const g = new Graphics();
-        g.rect(rect.x, rect.y, rect.width, rect.height);
-        g.stroke({ color: color, width: 2 });
-        layer.addChild(g);
-    };
+
 
     useEffect(() => {
         let destroyed = false;
@@ -125,25 +121,14 @@ export default function Game() {
             // Camadas (Containers) para organizar o Z-Index
             const mapLayer = new Container();
             const gameLayer = new Container();
-            const debugLayer = new Container();
-            const staticDebugLayer = new Container(); // Grid do mapa (estático)
-            const dynamicDebugLayer = new Container(); // Hitboxes (dinâmico)
-
             app.stage.addChild(mapLayer);
             app.stage.addChild(gameLayer);
-            app.stage.addChild(debugLayer); // Debug por cima de tudo
-
-            debugLayer.addChild(staticDebugLayer);
-            debugLayer.addChild(dynamicDebugLayer);
-
-            debugLayerRef.current = debugLayer;
-            debugLayer.visible = false; // Começa invisível
 
             const loadMap = async (mapId, spawnX, spawnY) => {
                 const config = MAPS[mapId];
                 if (!config) return;
 
-                console.log(`Carregando mapa: ${mapId}`);
+
 
                 // Limpar camada do mapa
                 mapLayer.removeChildren();
@@ -151,6 +136,12 @@ export default function Game() {
                 // Limpar poções de vida ao mudar de mapa
                 healthPotionsRef.current.forEach(potion => potion.destroy());
                 healthPotionsRef.current = [];
+
+                // Limpar máscara anterior (se houver)
+                if (maskItemRef.current) {
+                    maskItemRef.current.destroy();
+                    maskItemRef.current = null;
+                }
 
                 // Carregar e adicionar novo mapa
                 const mapaTexture = await Assets.load(config.asset);
@@ -170,8 +161,11 @@ export default function Game() {
 
                 // Gerenciar Música
                 if (config.music) {
-                    if (!musicRef.current || musicRef.current.src !== config.music) {
-                        // Se houver música tocando e for diferente, para a anterior
+                    // Se já existir música checa se é a mesma
+                    if (musicRef.current && musicRef.current._sourceId === config.music) {
+                        // É a mesma música, deixa tocando
+                    } else {
+                        // Música diferente ou nenhuma tocando
                         if (musicRef.current) {
                             musicRef.current.pause();
                         }
@@ -179,15 +173,16 @@ export default function Game() {
                         // Cria e toca a nova música
                         const nextMusic = new Audio(config.music);
                         nextMusic.loop = true;
-                        nextMusic.volume = 0.5; // Volume médio por padrão
+                        nextMusic.volume = 0.5;
+                        nextMusic._sourceId = config.music; // Identificador customizado para comparação confiável
 
-                        // Tentar tocar (browser pode bloquear sem interação inicial)
-                        nextMusic.play();
+                        // Tentar tocar
+                        nextMusic.play().catch(e => console.error("Erro ao tocar música:", e));
 
                         musicRef.current = nextMusic;
                     }
                 } else if (musicRef.current) {
-                    // Se o mapa não tiver música, para a atual
+                    // Mapa sem música
                     musicRef.current.pause();
                     musicRef.current = null;
                 }
@@ -199,6 +194,9 @@ export default function Game() {
                 if (config.spawnEnemies) {
                     const enemyTex = await Assets.load(inimigoImage);
                     const enemyRosaTex = await Assets.load(inimigoVerdeImage);
+
+                    // VERIFICAÇÃO DE SEGURANÇA: Se o jogo foi encerrado ou mudou de mapa durante o load async
+                    if (destroyed || currentMapRef.current !== mapId) return;
 
                     // Cria todos os inimigos do mapa
                     config.spawnEnemies.forEach((spawn, index) => {
@@ -225,99 +223,49 @@ export default function Game() {
                 }
 
                 // Spawnar Máscara se estiver no BEDROOM e ainda não tiver pego
-                // Remove item da máscara anterior se existir de qualquer mapa antigo
-                if (maskItemRef.current) {
-                    maskItemRef.current.destroy();
-                    maskItemRef.current = null;
+                if (mapId === 'BEDROOM' && !hero.hasWeapon && texturesRef.current.weapon) {
+                    const maskContainer = new Container();
+                    maskContainer.x = 415;
+                    maskContainer.y = 315;
+
+                    // 1. Aura/Glow (Círculo Amarelo Ajustado)
+                    const glow = new Graphics();
+                    glow.circle(0, 0, 30);
+                    glow.fill({ color: 0xFFD700, alpha: 0.4 });
+                    glow.stroke({ color: 0xFFFFFF, width: 2, alpha: 0.8 });
+                    maskContainer.addChild(glow);
+
+                    // 2. Sprite da Máscara (NOVO ASSET DIRETO)
+                    const maskItemTex = await Assets.load(mascaraItemImage);
+                    const maskSprite = new Sprite(maskItemTex);
+
+                    // SCALE: Ajustar para caber no círculo (60px)
+                    const maxDim = Math.max(maskItemTex.width, maskItemTex.height);
+                    const scale = 50 / maxDim; // Alvo: 50px visual
+                    maskSprite.scale.set(scale);
+
+                    maskSprite.anchor.set(0.5);
+                    // Centralizado (sem offsets malucos agora que é o sprite certo)
+                    maskSprite.x = 0;
+                    maskSprite.y = 0;
+
+                    maskContainer.addChild(maskSprite);
+
+                    gameLayer.addChild(maskContainer);
+                    maskItemRef.current = maskContainer;
                 }
 
-                // Spawnar Máscara se estiver no BEDROOM e ainda não tiver pego
-                if (mapId === 'BEDROOM' && !hero.hasWeapon) {
-                    const maskGraphics = new Graphics();
-                    maskGraphics.rect(0, 0, 30, 30);
-                    maskGraphics.fill({ color: 0xff00ff, alpha: 0.5 }); // Magenta semitransparente (hitbox debug)
-                    maskGraphics.stroke({ color: 0xffffff, width: 2 });
-                    maskGraphics.x = 400;
-                    maskGraphics.y = 300;
 
-                    gameLayer.addChild(maskGraphics); // Adiciona na gameLayer
-                    maskItemRef.current = maskGraphics;
-                }
-
-                drawDebug(config);
             };
             loadMapFuncRef.current = loadMap;
 
-            const drawDebug = (config) => {
-                if (!staticDebugLayer || !config.collisionMap) return;
-
-                staticDebugLayer.removeChildren();
-
-                const textContainer = new Container();
-                textContainer.eventMode = 'none';
-
-                config.collisionMap.forEach((row, rowIndex) => {
-                    row.forEach((tile, colIndex) => {
-                        const x = colIndex * TILE_SIZE;
-                        const y = rowIndex * TILE_SIZE;
-
-                        const tileGraphic = new Graphics();
-
-                        if (tile === 1) {
-                            tileGraphic.rect(0, 0, TILE_SIZE, TILE_SIZE);
-                            tileGraphic.fill({ color: 0xff0000, alpha: 0.3 });
-                        } else {
-                            tileGraphic.rect(0, 0, TILE_SIZE, TILE_SIZE);
-                            tileGraphic.fill({ color: 0x00ff00, alpha: 0.1 });
-                        }
-                        tileGraphic.rect(0, 0, TILE_SIZE, TILE_SIZE);
-                        tileGraphic.stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
-
-                        tileGraphic.x = x;
-                        tileGraphic.y = y;
-
-                        tileGraphic.eventMode = 'static';
-                        tileGraphic.cursor = 'pointer';
-                        tileGraphic.on('pointerdown', () => {
-                            config.collisionMap[rowIndex][colIndex] = tile === 1 ? 0 : 1;
-                            drawDebug(config);
-                        });
-
-                        staticDebugLayer.addChild(tileGraphic);
-
-                        const tileText = new Text({
-                            text: tile.toString(),
-                            style: {
-                                fontSize: 10,
-                                fill: tile === 1 ? 0xffcccc : 0xccffcc,
-                                fontWeight: 'bold'
-                            }
-                        });
-                        tileText.x = x + 2;
-                        tileText.y = y + 2;
-                        textContainer.addChild(tileText);
-                    });
-                });
-
-                if (config.doors) {
-                    const doorsGraphics = new Graphics();
-                    config.doors.forEach(door => {
-                        const doorX = door.col * TILE_SIZE;
-                        const doorY = door.row * TILE_SIZE;
-                        const doorW = (door.w || 1) * TILE_SIZE;
-                        const doorH = (door.h || 1) * TILE_SIZE;
-
-                        doorsGraphics.rect(doorX, doorY, doorW, doorH);
-                        doorsGraphics.fill({ color: 0x0000ff, alpha: 0.5 });
-                        doorsGraphics.stroke({ color: 0xffffff, width: 2 });
-                    });
-                    staticDebugLayer.addChild(doorsGraphics);
-                }
-
-                staticDebugLayer.addChild(textContainer);
-            };
 
             const heroTex = await Assets.load(loiraImage);
+            const heroMaskTex = await Assets.load(loiraMascaraImage);
+
+            // Salvar refs para restart
+            texturesRef.current = { normal: heroTex, weapon: heroMaskTex };
+
             const hero = new Hero(heroTex, INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
 
             // Pré-carregar textura da poção
@@ -326,6 +274,7 @@ export default function Game() {
             // Função para dropar poção de vida
             const dropHealthPotion = (x, y) => {
                 const potion = new Sprite(healPotionTex);
+                potion.anchor.set(0.5, 1); // Centralizado horizontalmente, base nos pés
                 potion.width = 50;
                 potion.height = 50;
                 potion.x = x;
@@ -349,10 +298,7 @@ export default function Game() {
             app.ticker.add(() => {
                 if (destroyed || (heroRef.current && heroRef.current.vida <= 0)) return;
 
-                // Limpar debug dinâmico (hitboxes móveis)
-                if (debugLayerRef.current && debugLayerRef.current.visible) {
-                    dynamicDebugLayer.removeChildren();
-                }
+
 
                 const currentMapConfig = MAPS[currentMapRef.current];
                 hero.update(currentMapConfig?.collisionMap);
@@ -388,13 +334,13 @@ export default function Game() {
                     for (let j = enemiesRef.current.length - 1; j >= 0; j--) {
                         const enemy = enemiesRef.current[j];
 
-                        // Hitbox de DANO do inimigo
-                        // Y é a base (pés) e a hitbox sobe até a altura total
+                        // Hitbox de DANO do inimigo (VISUAL)
+                        const ENEMY_DAMAGE_HEIGHT = 120;
                         const damageRect = {
                             x: enemy.x,
-                            y: enemy.y - ENEMY_HITBOX_HEIGHT, // Sobe da base
+                            y: enemy.y - ENEMY_DAMAGE_HEIGHT, // Sobe da base
                             width: ENEMY_HITBOX_WIDTH,
-                            height: ENEMY_HITBOX_HEIGHT
+                            height: ENEMY_DAMAGE_HEIGHT
                         };
 
                         if (checkCollision(pRect, damageRect)) {
@@ -429,11 +375,21 @@ export default function Game() {
 
                 // Checar item da máscara
                 if (maskItemRef.current && !hero.hasWeapon) {
+                    // Animação de pulso
+                    const pulse = 1 + Math.sin(Date.now() / 200) * 0.1;
+                    maskItemRef.current.scale.set(pulse);
+
                     const heroRect = { x: hero.x, y: hero.y - HERO_HITBOX_HEIGHT, width: HERO_HITBOX_WIDTH, height: HERO_HITBOX_HEIGHT };
-                    const maskRect = { x: maskItemRef.current.x, y: maskItemRef.current.y, width: 30, height: 30 };
+                    // Ajuste da hitbox da máscara para centralizada
+                    const maskRect = {
+                        x: maskItemRef.current.x - 20,
+                        y: maskItemRef.current.y - 20,
+                        width: 40,
+                        height: 40
+                    };
 
                     if (checkCollision(heroRect, maskRect)) {
-                        hero.hasWeapon = true;
+                        hero.equipWeapon(texturesRef.current.weapon); // Equipa nova textura
                         hero.addAmmo(5); // Dá 5 munições ao pegar
 
                         // Remover visualmente e da memória
@@ -449,10 +405,10 @@ export default function Game() {
                 }
 
                 // Checar coleta de poções de vida
-                const heroRect = { x: hero.x, y: hero.y, width: HERO_HITBOX_WIDTH, height: HERO_HITBOX_HEIGHT };
+                const heroRect = { x: hero.x, y: hero.y - HERO_HITBOX_HEIGHT, width: HERO_HITBOX_WIDTH, height: HERO_HITBOX_HEIGHT };
                 for (let i = healthPotionsRef.current.length - 1; i >= 0; i--) {
                     const potion = healthPotionsRef.current[i];
-                    const potionRect = { x: potion.x, y: potion.y - 50, width: 50, height: 50 }; // Y é a base
+                    const potionRect = { x: potion.x - 25, y: potion.y - 50, width: 50, height: 50 }; // Centralizado e acima da base
 
                     if (checkCollision(heroRect, potionRect)) {
                         // Curar meio coração (0.5 de vida), máximo 3
@@ -482,11 +438,7 @@ export default function Game() {
                         height: ENEMY_HITBOX_HEIGHT
                     };
 
-                    // Desenhar DEBUG (se ativo)
-                    if (debugLayerRef.current && debugLayerRef.current.visible) {
-                        drawHitbox(heroRect, 0x00ffff, dynamicDebugLayer); // Herói Ciano
-                        drawHitbox(enemyRect, 0xff0000, dynamicDebugLayer); // Inimigo Vermelho
-                    }
+
 
                     if (checkCollision(heroRect, enemyRect)) {
                         hero.takeDamage();
@@ -562,27 +514,9 @@ export default function Game() {
         };
     }, []);
 
-    const copyMapToClipboard = () => {
-        const currentMap = MAPS[currentMapRef.current];
-        if (!currentMap || !currentMap.collisionMap) return;
 
-        const rows = currentMap.collisionMap.map(row =>
-            `            [${row.join(', ')}]`
-        );
-        const matrixString = `        collisionMap: [\n${rows.join(',\n')}\n        ]`;
 
-        navigator.clipboard.writeText(matrixString).then(() => {
-            alert('Matriz copiada! Cole no arquivo maps.js');
-        }).catch(err => {
-            console.error(err);
-        });
-    };
 
-    const toggleDebug = () => {
-        if (debugLayerRef.current) {
-            debugLayerRef.current.visible = !debugLayerRef.current.visible;
-        }
-    };
 
     const restartGame = () => {
         if (heroRef.current) {
@@ -594,6 +528,12 @@ export default function Game() {
             heroRef.current.sprite.tint = 0xffffff;
             heroRef.current.sprite.alpha = 1;
             heroRef.current.ammo = heroRef.current.maxAmmo;
+
+            // Reverter para textura normal
+            if (texturesRef.current.normal) {
+                heroRef.current.equipWeapon(texturesRef.current.normal);
+                heroRef.current.hasWeapon = false; // equipWeapon seta true, forçamos false
+            }
         }
         setHealth(3);
         setGameOver(false);
@@ -620,6 +560,23 @@ export default function Game() {
         window.addEventListener('keydown', handleAnyKey);
         return () => window.removeEventListener('keydown', handleAnyKey);
     }, [dialog.open]);
+
+    // Listener para iniciar áudio na primeira interação (Autoplay Policy)
+    useEffect(() => {
+        const startAudio = () => {
+            if (musicRef.current && musicRef.current.paused) {
+                musicRef.current.play().catch(e => console.error("Erro ao retomar música:", e));
+            }
+        };
+
+        window.addEventListener('keydown', startAudio);
+        window.addEventListener('click', startAudio);
+
+        return () => {
+            window.removeEventListener('keydown', startAudio);
+            window.removeEventListener('click', startAudio);
+        };
+    }, []);
 
     return (
         <div style={{
@@ -767,17 +724,7 @@ export default function Game() {
                     </div>
                 )}
 
-                {/* DEBUG TOOLS */}
-                <div style={{
-                    position: 'absolute',
-                    top: '10px', right: '10px',
-                    display: 'flex', gap: '5px',
-                    zIndex: 20,
-                    opacity: 0.8
-                }}>
-                    <button onClick={toggleDebug} style={{ border: '2px solid white', background: '#2980b9', color: 'white', fontFamily: 'monospace', cursor: 'pointer', fontSize: '10px' }}>DEBUG_VIEW</button>
-                    <button onClick={copyMapToClipboard} style={{ border: '2px solid white', background: '#27ae60', color: 'white', fontFamily: 'monospace', cursor: 'pointer', fontSize: '10px' }}>COPY_MAP</button>
-                </div>
+
 
                 {/* GAME OVER OVERLAY */}
                 {gameOver && (

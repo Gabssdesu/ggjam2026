@@ -48,6 +48,34 @@ export class Hero {
         if (this.ammo > this.maxAmmo) this.ammo = this.maxAmmo;
     }
 
+    equipWeapon(newTexture) {
+        this.hasWeapon = true;
+
+        // Recalcular framerates e dimensões (assumindo mesmo layout)
+        const cols = 24;
+        const rows = 11;
+        const fw = newTexture.width / cols;
+        const fh = newTexture.height / rows;
+
+        // Atualizar animations
+        this.animations = {
+            right: this.extract(newTexture, 0, 0, fw, fh, 6),
+            up: this.extract(newTexture, 0, 6, fw, fh, 6),
+            left: this.extract(newTexture, 0, 12, fw, fh, 6),
+            down: this.extract(newTexture, 0, 18, fw, fh, 6),
+
+            idle_right: this.extract(newTexture, 0, 0, fw, fh, 1),
+            idle_up: this.extract(newTexture, 0, 6, fw, fh, 1),
+            idle_left: this.extract(newTexture, 0, 12, fw, fh, 1),
+            idle_down: this.extract(newTexture, 0, 18, fw, fh, 1)
+        };
+
+        // Atualiza textura atual imediatamente para evitar glitch
+        const currentKey = this.currentAnim && this.animations[this.currentAnim] ? this.currentAnim : 'idle_down';
+        this.sprite.textures = this.animations[currentKey];
+        this.sprite.play();
+    }
+
     constructor(baseTexture, initialX, initialY) {
         this.x = initialX;
         this.y = initialY;
@@ -166,7 +194,7 @@ export class Hero {
 
             // Log a cada 60 frames (aprox 1 seg) para não flodar
             if (this.invincibilityTimer % 60 === 0) {
-                console.log(`Invencível. Timer: ${this.invincibilityTimer}`);
+
             }
 
             // Efeito visual de piscar
@@ -175,7 +203,7 @@ export class Hero {
             if (this.invincibilityTimer <= 0) {
                 this.isInvincible = false;
                 this.sprite.alpha = 1;
-                console.log("Invencibilidade acabou.");
+
             }
         }
 
@@ -277,7 +305,7 @@ export class Hero {
         this.isInvincible = true;
         this.invincibilityTimer = this.invincibilityDuration;
 
-        console.log(`Dano recebido! Vidas restantes: ${this.vida}`);
+
 
         if (this.vida <= 0) {
             this.die();
@@ -285,7 +313,7 @@ export class Hero {
     }
 
     die() {
-        console.log("Game Over!");
+
         // Por enquanto apenas congela ou reseta
         this.sprite.tint = 0xff0000;
     }
