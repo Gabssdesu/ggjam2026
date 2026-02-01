@@ -9,6 +9,7 @@ import inimigoImage from '../../assets/inimigo.png';
 import devil1Sound from '../../assets/Devil1.m4a';
 import devil2Sound from '../../assets/Devil2.m4a';
 import inimigoRosaImage from '../../assets/inimigo_rosa.png';
+import healPotionImage from '../../assets/heal_potion.png';
 import MAPS from '../../constants/maps.js';
 import {
     CANVAS_WIDTH,
@@ -36,7 +37,7 @@ export default function Game() {
     const debugLayerRef = useRef(null);
     const staminaRef = useRef(null);
     const ammoRef = useRef(null); // Ref para texto de munição
-    const globalEnemiesState = useRef({}); // Estado persistente dos inimigos { mapId: [{type, dead, x, y}] }
+    const healthPotionsRef = useRef([]); // Array para poções de vida dropadas
 
     const [health, setHealth] = useState(3);
     const [gameOver, setGameOver] = useState(false);
@@ -142,6 +143,10 @@ export default function Game() {
                 // Limpar camada do mapa
                 mapLayer.removeChildren();
 
+                // Limpar poções de vida ao mudar de mapa
+                healthPotionsRef.current.forEach(potion => potion.destroy());
+                healthPotionsRef.current = [];
+
                 // Carregar e adicionar novo mapa
                 const mapaTexture = await Assets.load(config.asset);
                 const mapa = new Sprite(mapaTexture);
@@ -182,40 +187,23 @@ export default function Game() {
                     musicRef.current = null;
                 }
 
-                // Gerar inimigos do mapa com persistência
+                // Gerar inimigos do mapa - sempre respawna
                 enemiesRef.current.forEach(e => e.destroy());
                 enemiesRef.current = [];
 
                 if (config.spawnEnemies) {
-                    // Se não tiver estado salvo para este mapa, inicializa
-                    if (!globalEnemiesState.current[mapId]) {
-                        globalEnemiesState.current[mapId] = config.spawnEnemies.map(spawn => {
-                            // Sorteio do tipo (0: normal, 1: rosa)
-                            // 50% de chance para cada
-                            const isRosa = Math.random() > 0.5;
-                            return {
-                                x: spawn.x,
-                                y: spawn.y,
-                                type: isRosa ? 'rosa' : 'normal',
-                                dead: false
-                            };
-                        });
-                    }
-
                     const enemyTex = await Assets.load(inimigoImage);
                     const enemyRosaTex = await Assets.load(inimigoRosaImage);
 
-                    // Cria inimigos baseados no estado salvo
-                    globalEnemiesState.current[mapId].forEach((enemyState) => {
-                        if (enemyState.dead) return; // Não cria se já morreu
+                    // Cria todos os inimigos do mapa
+                    config.spawnEnemies.forEach((spawn) => {
+                        // Sorteio do tipo (0: normal, 1: rosa)
+                        // 50% de chance para cada
+                        const isRosa = Math.random() > 0.5;
+                        const texture = isRosa ? enemyRosaTex : enemyTex;
+                        const enemy = new Enemy(texture, spawn.x, spawn.y);
 
-                        const texture = enemyState.type === 'rosa' ? enemyRosaTex : enemyTex;
-                        const enemy = new Enemy(texture, enemyState.x, enemyState.y);
-
-                        // Vincula o sprite ao estado para saber qual atualizar ao morrer
-                        enemy.stateReference = enemyState;
-
-                        gameLayer.addChild(enemy.getSprite()); // Adiciona na gameLayer
+                        gameLayer.addChild(enemy.getSprite());
                         enemiesRef.current.push(enemy);
                     });
                 }
@@ -316,6 +304,20 @@ export default function Game() {
             const heroTex = await Assets.load(loiraImage);
             const hero = new Hero(heroTex, INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
 
+            // Pré-carregar textura da poção
+            const healPotionTex = await Assets.load(healPotionImage);
+
+            // Função para dropar poção de vida
+            const dropHealthPotion = (x, y) => {
+                const potion = new Sprite(healPotionTex);
+                potion.width = 50;
+                potion.height = 50;
+                potion.x = x;
+                potion.y = y;
+                gameLayer.addChild(potion);
+                healthPotionsRef.current.push(potion);
+            };
+
             // Configurar callback do tiro
             hero.onShoot = (x, y, dir) => {
                 const projectile = new Projectile(x, y, dir);
@@ -389,10 +391,10 @@ export default function Game() {
                         };
 
                         if (checkCollision(pRect, eRect)) {
+                            // Dropar poção de vida na posição do inimigo
+                            dropHealthPotion(enemy.x, enemy.y);
+
                             // Matar Inimigo
-                            if (enemy.stateReference) {
-                                enemy.stateReference.dead = true; // Marca como morto permanentemente
-                            }
                             enemy.destroy();
                             enemiesRef.current.splice(j, 1);
 
@@ -427,6 +429,25 @@ export default function Game() {
                             text: 'MÁSCARA OBTIDA!\nVocê encontrou uma arma antiga.\nPressione Z para atirar.'
                         });
                         setTimeout(() => setDialog({ open: false, text: '' }), 4000); // Fecha auto em 4s
+                    }
+                }
+
+                // Checar coleta de poções de vida
+                const heroRect = { x: hero.x, y: hero.y, width: HERO_HITBOX_WIDTH, height: HERO_HITBOX_HEIGHT };
+                for (let i = healthPotionsRef.current.length - 1; i >= 0; i--) {
+                    const potion = healthPotionsRef.current[i];
+                    const potionRect = { x: potion.x, y: potion.y, width: 50, height: 50 };
+
+                    if (checkCollision(heroRect, potionRect)) {
+                        // Curar meio coração (0.5 de vida), máximo 3
+                        if (hero.vida < 3) {
+                            hero.vida = Math.min(3, hero.vida + 0.5);
+                            setHealth(hero.vida);
+
+                            // Remover poção
+                            potion.destroy();
+                            healthPotionsRef.current.splice(i, 1);
+                        }
                     }
                 }
 
@@ -495,6 +516,7 @@ export default function Game() {
                 heroRef.current.destroy();
             }
             enemiesRef.current.forEach(e => e.destroy());
+            healthPotionsRef.current.forEach(potion => potion.destroy());
             if (musicRef.current) {
                 musicRef.current.pause();
                 musicRef.current = null;
