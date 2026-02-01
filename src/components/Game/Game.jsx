@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Application, Sprite, Assets, Graphics, Container, Text } from 'pixi.js';
 import { Heart } from 'lucide-react';
 import loiraImage from '../../assets/heroina.png';
@@ -13,6 +13,8 @@ import {
     INITIAL_PLAYER_Y,
     HERO_HITBOX_WIDTH,
     HERO_HITBOX_HEIGHT,
+    ENEMY_HITBOX_WIDTH,
+    ENEMY_HITBOX_HEIGHT,
     TILE_SIZE
 } from '../../constants/game-world';
 
@@ -20,11 +22,15 @@ export default function Game() {
     const canvasRef = useRef(null);
     const appRef = useRef(null);
     const heroRef = useRef(null);
-    const enemyRef = useRef(null);
+    const enemiesRef = useRef([]); // Array para múltiplos inimigos
+    const musicRef = useRef(null); // Referência para o áudio
+    const loadMapFuncRef = useRef(null);
     const currentMapRef = useRef('HALLSPAWN');
     const mapSpriteRef = useRef(null);
     const debugLayerRef = useRef(null);
     const staminaRef = useRef(null);
+    const [health, setHealth] = useState(3);
+    const [gameOver, setGameOver] = useState(false);
 
     const checkCollision = (r1, r2) => {
         return r1.x < r2.x + r2.width &&
@@ -94,8 +100,46 @@ export default function Game() {
                     heroRef.current.updateSpritePosition();
                 }
 
+                // Gerenciar Música
+                if (config.music) {
+                    if (!musicRef.current || musicRef.current.src !== config.music) {
+                        // Se houver música tocando e for diferente, para a anterior
+                        if (musicRef.current) {
+                            musicRef.current.pause();
+                        }
+
+                        // Cria e toca a nova música
+                        const nextMusic = new Audio(config.music);
+                        nextMusic.loop = true;
+                        nextMusic.volume = 0.5; // Volume médio por padrão
+
+                        // Tentar tocar (browser pode bloquear sem interação inicial)
+                        nextMusic.play().catch(e => console.warn("Música bloqueada pelo browser. Clique no jogo para ouvir."));
+
+                        musicRef.current = nextMusic;
+                    }
+                } else if (musicRef.current) {
+                    // Se o mapa não tiver música, para a atual
+                    musicRef.current.pause();
+                    musicRef.current = null;
+                }
+
+                // Gerar inimigos do mapa
+                enemiesRef.current.forEach(e => e.destroy());
+                enemiesRef.current = [];
+
+                if (config.spawnEnemies) {
+                    const enemyTex = await Assets.load(inimigoImage);
+                    config.spawnEnemies.forEach(spawn => {
+                        const enemy = new Enemy(enemyTex, spawn.x, spawn.y);
+                        app.stage.addChild(enemy.getSprite());
+                        enemiesRef.current.push(enemy);
+                    });
+                }
+
                 drawDebug(config);
             };
+            loadMapFuncRef.current = loadMap;
 
             const drawDebug = (config) => {
                 if (!debugLayerRef.current || !config.collisionMap) return;
@@ -171,17 +215,12 @@ export default function Game() {
             app.stage.addChild(hero.getSprite());
             heroRef.current = hero;
 
-            const enemyTex = await Assets.load(inimigoImage);
-            const enemy = new Enemy(enemyTex, 400, 300);
-            app.stage.addChild(enemy.getSprite());
-            enemyRef.current = enemy;
-
             app.stage.addChild(debugLayer);
 
             await loadMap('HALLSPAWN', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
 
             app.ticker.add(() => {
-                if (destroyed) return;
+                if (destroyed || (heroRef.current && heroRef.current.vida <= 0)) return;
 
                 const currentMapConfig = MAPS[currentMapRef.current];
                 hero.update(currentMapConfig?.collisionMap);
@@ -191,14 +230,38 @@ export default function Game() {
                     staminaRef.current.style.width = `${hero.energia}%`;
                 }
 
-                if (enemyRef.current) {
-                    enemyRef.current.update(currentMapConfig?.collisionMap, hero);
-                }
+                enemiesRef.current.forEach(enemy => {
+                    enemy.update(currentMapConfig?.collisionMap, hero);
+                });
 
                 if (hero.x < 0) hero.x = 0;
                 if (hero.y < 0) hero.y = 0;
                 if (hero.x > CANVAS_WIDTH - HERO_HITBOX_WIDTH) hero.x = CANVAS_WIDTH - HERO_HITBOX_WIDTH;
                 if (hero.y > CANVAS_HEIGHT - HERO_HITBOX_HEIGHT) hero.y = CANVAS_HEIGHT - HERO_HITBOX_HEIGHT;
+
+                // Colisão com Inimigos
+                enemiesRef.current.forEach(enemy => {
+                    const heroRect = {
+                        x: hero.x,
+                        y: hero.y,
+                        width: HERO_HITBOX_WIDTH,
+                        height: HERO_HITBOX_HEIGHT
+                    };
+                    const enemyRect = {
+                        x: enemy.x,
+                        y: enemy.y,
+                        width: ENEMY_HITBOX_WIDTH,
+                        height: ENEMY_HITBOX_HEIGHT
+                    };
+
+                    if (checkCollision(heroRect, enemyRect)) {
+                        hero.takeDamage();
+                        setHealth(hero.vida);
+                        if (hero.vida <= 0) {
+                            setGameOver(true);
+                        }
+                    }
+                });
 
                 hero.updateSpritePosition();
 
@@ -234,6 +297,11 @@ export default function Game() {
             if (heroRef.current) {
                 heroRef.current.destroy();
             }
+            enemiesRef.current.forEach(e => e.destroy());
+            if (musicRef.current) {
+                musicRef.current.pause();
+                musicRef.current = null;
+            }
             if (appRef.current) {
                 appRef.current.destroy(true, { children: true });
                 appRef.current = null;
@@ -267,6 +335,24 @@ export default function Game() {
     const toggleDebug = () => {
         if (debugLayerRef.current) {
             debugLayerRef.current.visible = !debugLayerRef.current.visible;
+        }
+    };
+
+    const restartGame = () => {
+        if (heroRef.current) {
+            heroRef.current.vida = 3;
+            heroRef.current.energia = 100;
+            heroRef.current.x = INITIAL_PLAYER_X;
+            heroRef.current.y = INITIAL_PLAYER_Y;
+            heroRef.current.isInvincible = false;
+            heroRef.current.sprite.tint = 0xffffff;
+            heroRef.current.sprite.alpha = 1;
+        }
+        setHealth(3);
+        setGameOver(false);
+
+        if (loadMapFuncRef.current) {
+            loadMapFuncRef.current('HALLSPAWN', INITIAL_PLAYER_X, INITIAL_PLAYER_Y);
         }
     };
 
@@ -317,9 +403,19 @@ export default function Game() {
                         gap: '8px',
                         alignItems: 'center'
                     }}>
-                        <Heart size={32} fill="#e74c3c" color="#fff" strokeWidth={2} />
-                        <Heart size={32} fill="#e74c3c" color="#fff" strokeWidth={2} />
-                        <Heart size={32} fill="#e74c3c" color="#fff" strokeWidth={2} />
+                        {[...Array(3)].map((_, i) => (
+                            <Heart
+                                key={i}
+                                size={32}
+                                fill={i < health ? "#e74c3c" : "transparent"}
+                                color={i < health ? "#fff" : "#333"}
+                                strokeWidth={2}
+                                style={{
+                                    opacity: i < health ? 1 : 0.3,
+                                    transition: 'all 0.3s ease'
+                                }}
+                            />
+                        ))}
                     </div>
 
                     {/* STAMINA BAR CONTAINER */}
@@ -373,6 +469,52 @@ export default function Game() {
                     <button onClick={toggleDebug} style={{ border: '2px solid white', background: '#2980b9', color: 'white', fontFamily: 'monospace', cursor: 'pointer', fontSize: '10px' }}>DEBUG_VIEW</button>
                     <button onClick={copyMapToClipboard} style={{ border: '2px solid white', background: '#27ae60', color: 'white', fontFamily: 'monospace', cursor: 'pointer', fontSize: '10px' }}>COPY_MAP</button>
                 </div>
+
+                {/* GAME OVER OVERLAY */}
+                {gameOver && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 0, left: 0,
+                        width: '100%', height: '100%',
+                        backgroundColor: 'rgba(0,0,0,0.85)',
+                        zIndex: 100,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        textAlign: 'center',
+                        backdropFilter: 'blur(4px)'
+                    }}>
+                        <h1 style={{
+                            fontSize: '64px',
+                            marginBottom: '20px',
+                            color: '#e74c3c',
+                            textShadow: '4px 4px 0 #000',
+                            letterSpacing: '8px'
+                        }}>VOCÊ MORREU</h1>
+                        <p style={{ fontSize: '18px', marginBottom: '40px', color: '#bdc3c7' }}>Os fantasmas te pegaram...</p>
+
+                        <button
+                            onClick={restartGame}
+                            style={{
+                                padding: '15px 40px',
+                                fontSize: '24px',
+                                backgroundColor: '#27ae60',
+                                color: 'white',
+                                border: '4px solid #fff',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                boxShadow: '4px 4px 0 #000',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.target.style.transform = 'scale(1.1)'}
+                            onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                        >
+                            TENTAR NOVAMENTE
+                        </button>
+                    </div>
+                )}
 
             </div>
 

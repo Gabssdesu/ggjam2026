@@ -5,12 +5,17 @@
   margin: 0;
 }
 
-html, body {
+html,
+body {
   height: 100vh;
   width: 100vw;
-  overflow: hidden; /* Impede barras de scroll */
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  /* Impede barras de scroll */
 }
 
 canvas {
-  display: block; /* Remove espaço em branco embaixo */
+  display: block;
+  /* Remove espaço em branco embaixo */
 }

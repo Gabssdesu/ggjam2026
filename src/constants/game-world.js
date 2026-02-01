@@ -13,6 +13,10 @@ export const CHARACTER_SPEED = 4;
 export const HERO_HITBOX_WIDTH = 50;
 export const HERO_HITBOX_HEIGHT = 100;
 
+// Dimensões da hitbox do inimigo
+export const ENEMY_HITBOX_WIDTH = 50;
+export const ENEMY_HITBOX_HEIGHT = 30; // Altura reduzida como solicitado
+
 // Dimensões visuais do personagem (para compensar transparência)
 export const HERO_SPRITE_WIDTH = 120;
 export const HERO_SPRITE_HEIGHT = 140;

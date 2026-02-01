@@ -10,7 +10,7 @@ export class Hero {
     x = 0;
     y = 0;
     lastDirection = 'down'; // Começa olhando pra baixo
-            
+
     // Estados de Input e Movimento
     movingDirection = [];
     directionHorizontal = 1;
@@ -23,6 +23,10 @@ export class Hero {
 
     // Propriedades
     energia = 100;
+    vida = 3;
+    isInvincible = false;
+    invincibilityTimer = 0;
+    invincibilityDuration = 120; // Aproximadamente 2 segundos a 60fps
 
     constructor(baseTexture, initialX, initialY) {
         this.x = initialX;
@@ -145,6 +149,18 @@ export class Hero {
             vy *= factor;
         }
 
+        // --- SISTEMA DE DANO E INVENCIBILIDADE ---
+        if (this.isInvincible) {
+            this.invincibilityTimer--;
+            // Efeito visual de piscar
+            this.sprite.alpha = (Math.floor(this.invincibilityTimer / 5) % 2 === 0) ? 0.5 : 1;
+
+            if (this.invincibilityTimer <= 0) {
+                this.isInvincible = false;
+                this.sprite.alpha = 1;
+            }
+        }
+
         // --- SISTEMA DE ENERGIA ---
         const isMoving = vx !== 0 || vy !== 0;
 
@@ -210,6 +226,26 @@ export class Hero {
     updateSpritePosition() {
         this.sprite.x = this.x + 25; // Centro da hitbox (50/2)
         this.sprite.y = this.y + 100; // Base da hitbox (100)
+    }
+
+    takeDamage() {
+        if (this.isInvincible || this.vida <= 0) return;
+
+        this.vida -= 1;
+        this.isInvincible = true;
+        this.invincibilityTimer = this.invincibilityDuration;
+
+        console.log(`Dano recebido! Vidas restantes: ${this.vida}`);
+
+        if (this.vida <= 0) {
+            this.die();
+        }
+    }
+
+    die() {
+        console.log("Game Over!");
+        // Por enquanto apenas congela ou reseta
+        this.sprite.tint = 0xff0000;
     }
 
     getSprite() { return this.sprite; }

@@ -4,6 +4,8 @@ import {
     CHARACTER_SPEED,
     HERO_HITBOX_WIDTH,
     HERO_HITBOX_HEIGHT,
+    ENEMY_HITBOX_WIDTH,
+    ENEMY_HITBOX_HEIGHT,
     CANVAS_WIDTH,
     CANVAS_HEIGHT
 } from '../../constants/game-world';
@@ -129,11 +131,11 @@ export class Enemy {
             let collided = false;
 
             // 1. Verificar limites da tela
-            if (nextX < 0 || nextX > CANVAS_WIDTH - HERO_HITBOX_WIDTH) collided = true;
-            if (nextY < 0 || nextY > CANVAS_HEIGHT - HERO_HITBOX_HEIGHT) collided = true;
+            if (nextX < 0 || nextX > CANVAS_WIDTH - ENEMY_HITBOX_WIDTH) collided = true;
+            if (nextY < 0 || nextY > CANVAS_HEIGHT - ENEMY_HITBOX_HEIGHT) collided = true;
 
             // 2. Verificar colisão com paredes
-            if (!collided && !canMove(nextX, nextY, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, collisionMap)) {
+            if (!collided && !canMove(nextX, nextY, ENEMY_HITBOX_WIDTH, ENEMY_HITBOX_HEIGHT, collisionMap)) {
                 collided = true;
             }
 
@@ -178,14 +180,15 @@ export class Enemy {
 
     // Helper para verificar colisão simples usada no deslize
     canMoveSafely(tx, ty, collisionMap) {
-        if (tx < 0 || tx > CANVAS_WIDTH - HERO_HITBOX_WIDTH) return false;
-        if (ty < 0 || ty > CANVAS_HEIGHT - HERO_HITBOX_HEIGHT) return false;
-        return canMove(tx, ty, HERO_HITBOX_WIDTH, HERO_HITBOX_HEIGHT, collisionMap);
+        if (tx < 0 || tx > CANVAS_WIDTH - ENEMY_HITBOX_WIDTH) return false;
+        if (ty < 0 || ty > CANVAS_HEIGHT - ENEMY_HITBOX_HEIGHT) return false;
+        return canMove(tx, ty, ENEMY_HITBOX_WIDTH, ENEMY_HITBOX_HEIGHT, collisionMap);
     }
 
     updateSpritePosition() {
-        this.sprite.x = this.x + 25;
-        this.sprite.y = this.y + 100;
+        // Agora o sprite é posicionado em relação ao CENTRO da hitbox
+        this.sprite.x = this.x + ENEMY_HITBOX_WIDTH / 2;
+        this.sprite.y = this.y + ENEMY_HITBOX_HEIGHT + 20; // Ajuste para descer o sprite em relação à hitbox
     }
 
     getSprite() { return this.sprite; }
